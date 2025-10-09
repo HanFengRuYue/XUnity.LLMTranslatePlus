@@ -1,0 +1,2 @@
+# XUnity.LLMTranslatePlus
+XUnity.AutoTranslator使用AI大语言模型翻译游戏
