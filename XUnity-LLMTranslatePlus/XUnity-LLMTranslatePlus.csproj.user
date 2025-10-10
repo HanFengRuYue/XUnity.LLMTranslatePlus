@@ -4,7 +4,7 @@
     <DebuggerFlavor>ProjectDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup>
-    <ActiveDebugProfile>XUnity-LLMTranslatePlus (Package)</ActiveDebugProfile>
+    <ActiveDebugProfile>XUnity-LLMTranslatePlus (Unpackaged)</ActiveDebugProfile>
   </PropertyGroup>
   <ItemGroup>
     <None Update="App.xaml">

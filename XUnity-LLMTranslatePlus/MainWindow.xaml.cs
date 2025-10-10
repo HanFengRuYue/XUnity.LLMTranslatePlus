@@ -1,31 +1,49 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
+using XUnity_LLMTranslatePlus.Views;
 
 namespace XUnity_LLMTranslatePlus
 {
     /// <summary>
-    /// An empty window that can be used on its own or navigated to within a Frame.
+    /// 主窗口
     /// </summary>
     public sealed partial class MainWindow : Window
     {
         public MainWindow()
         {
             InitializeComponent();
+            Title = "XUnity大语言模型翻译Plus";
+            
+            // 设置窗口大小
+            this.AppWindow.Resize(new Windows.Graphics.SizeInt32(1280, 800));
+            
+            // 默认导航到主页
+            NavView.SelectedItem = NavView.MenuItems[0];
+            ContentFrame.Navigate(typeof(HomePage));
+        }
+
+        private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+        {
+            if (args.SelectedItem is NavigationViewItem selectedItem)
+            {
+                string tag = selectedItem.Tag?.ToString() ?? "";
+                
+                Type pageType = tag switch
+                {
+                    "Home" => typeof(HomePage),
+                    "ApiConfig" => typeof(ApiConfigPage),
+                    "TranslationSettings" => typeof(TranslationSettingsPage),
+                    "TextEditor" => typeof(TextEditorPage),
+                    "Log" => typeof(LogPage),
+                    _ => null
+                };
+
+                if (pageType != null && ContentFrame.CurrentSourcePageType != pageType)
+                {
+                    ContentFrame.Navigate(pageType);
+                }
+            }
         }
     }
 }

@@ -1,0 +1,138 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 应用标题 -->
+    <x:String x:Key="AppTitle">XUnity大语言模型翻译Plus</x:String>
+
+    <!-- 导航菜单 -->
+    <x:String x:Key="NavHome">主页</x:String>
+    <x:String x:Key="NavApiConfig">API 配置</x:String>
+    <x:String x:Key="NavTranslationSettings">翻译设置</x:String>
+    <x:String x:Key="NavTextEditor">文本编辑器</x:String>
+    <x:String x:Key="NavLog">日志监控</x:String>
+
+    <!-- 主页 -->
+    <x:String x:Key="HomeStatus">当前状态</x:String>
+    <x:String x:Key="HomeStatusRunning">运行中</x:String>
+    <x:String x:Key="HomeStatusStopped">已停止</x:String>
+    <x:String x:Key="HomeStatusWaiting">等待中</x:String>
+    <x:String x:Key="HomeTranslatedCount">已翻译</x:String>
+    <x:String x:Key="HomePendingCount">待翻译</x:String>
+    <x:String x:Key="HomeErrorCount">错误</x:String>
+    <x:String x:Key="HomeStartMonitoring">开始监控</x:String>
+    <x:String x:Key="HomeStopMonitoring">停止监控</x:String>
+    <x:String x:Key="HomeRefresh">刷新</x:String>
+    <x:String x:Key="HomeOpenGameDir">打开游戏目录</x:String>
+    <x:String x:Key="HomeRecentTranslations">最近翻译</x:String>
+
+    <!-- API 配置页面 -->
+    <x:String x:Key="ApiConfigTitle">API 配置</x:String>
+    <x:String x:Key="ApiBasicConfig">基础配置</x:String>
+    <x:String x:Key="ApiPlatform">API 平台</x:String>
+    <x:String x:Key="ApiUrl">API 地址</x:String>
+    <x:String x:Key="ApiKey">API 密钥</x:String>
+    <x:String x:Key="ApiModelName">模型名称</x:String>
+    <x:String x:Key="ApiTestConnection">测试连接</x:String>
+    
+    <x:String x:Key="ApiAdvancedConfig">高级配置</x:String>
+    <x:String x:Key="ApiMaxTokens">最大令牌数</x:String>
+    <x:String x:Key="ApiTemperature">温度</x:String>
+    <x:String x:Key="ApiTopP">Top P</x:String>
+    <x:String x:Key="ApiFrequencyPenalty">频率惩罚</x:String>
+    <x:String x:Key="ApiPresencePenalty">存在惩罚</x:String>
+    <x:String x:Key="ApiTimeout">超时时间（秒）</x:String>
+    <x:String x:Key="ApiRetryCount">重试次数</x:String>
+    
+    <x:String x:Key="ApiConcurrencyConfig">并发配置</x:String>
+    <x:String x:Key="ApiConcurrentThreads">并发线程数</x:String>
+    <x:String x:Key="ApiEnableBatch">启用批量翻译</x:String>
+    <x:String x:Key="ApiBatchSize">批量大小</x:String>
+    
+    <x:String x:Key="ApiSystemPrompt">系统提示词</x:String>
+    <x:String x:Key="ApiPromptTemplate">提示词模板</x:String>
+    <x:String x:Key="ApiPromptVariables">可用变量：{目标语言}、{原文}、{术语}、{上下文}</x:String>
+    <x:String x:Key="ApiResetPrompt">重置为默认</x:String>
+    
+    <x:String x:Key="ApiTermsDatabase">术语库</x:String>
+    <x:String x:Key="ApiTermsTableOriginal">原文</x:String>
+    <x:String x:Key="ApiTermsTableTranslation">译文</x:String>
+    <x:String x:Key="ApiTermsTablePriority">优先级</x:String>
+    <x:String x:Key="ApiTermsTableEnabled">启用</x:String>
+    <x:String x:Key="ApiTermsAdd">添加</x:String>
+    <x:String x:Key="ApiTermsDelete">删除</x:String>
+    <x:String x:Key="ApiTermsImport">导入</x:String>
+    <x:String x:Key="ApiTermsExport">导出</x:String>
+    <x:String x:Key="ApiTermsFilePath">术语库文件路径</x:String>
+    <x:String x:Key="ApiBrowse">浏览...</x:String>
+
+    <!-- 翻译设置页面 -->
+    <x:String x:Key="TranslationSettingsTitle">翻译设置</x:String>
+    <x:String x:Key="TranslationXUnityConfig">XUnity 配置</x:String>
+    <x:String x:Key="TranslationGameDirectory">游戏根目录</x:String>
+    <x:String x:Key="TranslationAutoDetectPath">自动检测路径</x:String>
+    <x:String x:Key="TranslationCurrentPath">当前 Translation 文件路径</x:String>
+    
+    <x:String x:Key="TranslationOptions">翻译选项</x:String>
+    <x:String x:Key="TranslationTargetLanguage">目标语言</x:String>
+    <x:String x:Key="TranslationSourceLanguage">源语言</x:String>
+    <x:String x:Key="TranslationPreserveSpecialChars">保留特殊符号</x:String>
+    <x:String x:Key="TranslationRealTimeMonitoring">实时监控</x:String>
+    <x:String x:Key="TranslationMonitorInterval">文件监控间隔（毫秒）</x:String>
+    
+    <x:String x:Key="TranslationContextConfig">上下文配置</x:String>
+    <x:String x:Key="TranslationEnableContext">启用上下文参考</x:String>
+    <x:String x:Key="TranslationContextLines">上下文行数</x:String>
+    <x:String x:Key="TranslationContextWeight">上下文权重</x:String>
+    
+    <x:String x:Key="TranslationOutputConfig">输出配置</x:String>
+    <x:String x:Key="TranslationSaveBackup">保存原文备份</x:String>
+    <x:String x:Key="TranslationEnableCache">翻译缓存</x:String>
+    <x:String x:Key="TranslationExportLog">导出翻译日志</x:String>
+
+    <!-- 文本编辑器页面 -->
+    <x:String x:Key="TextEditorTitle">文本编辑器</x:String>
+    <x:String x:Key="TextEditorSearch">搜索键或值...</x:String>
+    <x:String x:Key="TextEditorFilterAll">全部</x:String>
+    <x:String x:Key="TextEditorFilterUntranslated">未翻译</x:String>
+    <x:String x:Key="TextEditorFilterTranslated">已翻译</x:String>
+    <x:String x:Key="TextEditorFilterError">错误</x:String>
+    <x:String x:Key="TextEditorOriginalText">原文（键）</x:String>
+    <x:String x:Key="TextEditorTranslatedText">译文（值）</x:String>
+    <x:String x:Key="TextEditorSpecialChars">特殊符号</x:String>
+    <x:String x:Key="TextEditorSave">保存</x:String>
+    <x:String x:Key="TextEditorUndo">撤销</x:String>
+    <x:String x:Key="TextEditorTranslateThis">使用 AI 翻译此条</x:String>
+    <x:String x:Key="TextEditorCopyOriginal">复制原文</x:String>
+    <x:String x:Key="TextEditorTotalEntries">总条目数</x:String>
+    <x:String x:Key="TextEditorTranslatedEntries">已翻译</x:String>
+    <x:String x:Key="TextEditorUntranslatedEntries">未翻译</x:String>
+    <x:String x:Key="TextEditorTranslateAll">全部翻译</x:String>
+    <x:String x:Key="TextEditorExport">导出</x:String>
+    <x:String x:Key="TextEditorImport">导入</x:String>
+
+    <!-- 日志监控页面 -->
+    <x:String x:Key="LogTitle">日志监控</x:String>
+    <x:String x:Key="LogStatus">状态</x:String>
+    <x:String x:Key="LogSuccessCount">成功</x:String>
+    <x:String x:Key="LogFailureCount">失败</x:String>
+    <x:String x:Key="LogQueueCount">队列</x:String>
+    <x:String x:Key="LogAutoScroll">自动滚动</x:String>
+    <x:String x:Key="LogFilterInfo">Info</x:String>
+    <x:String x:Key="LogFilterWarning">Warning</x:String>
+    <x:String x:Key="LogFilterError">Error</x:String>
+    <x:String x:Key="LogFilterDebug">Debug</x:String>
+    <x:String x:Key="LogClear">清空日志</x:String>
+    <x:String x:Key="LogExport">导出日志</x:String>
+    <x:String x:Key="LogPauseResume">暂停/继续记录</x:String>
+
+    <!-- 通用 -->
+    <x:String x:Key="CommonSave">保存</x:String>
+    <x:String x:Key="CommonCancel">取消</x:String>
+    <x:String x:Key="CommonOk">确定</x:String>
+    <x:String x:Key="CommonBrowse">浏览</x:String>
+    <x:String x:Key="CommonRefresh">刷新</x:String>
+    <x:String x:Key="CommonClose">关闭</x:String>
+</ResourceDictionary>
+
+

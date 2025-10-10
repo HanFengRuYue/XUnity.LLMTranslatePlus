@@ -1,0 +1,36 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{810811E3-5C78-4B99-B7A2-C778ABA70320}|XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj|d:\\document\\git\\xunity.llmtranslateplus\\xunity-llmtranslateplus\\xunity-llmtranslateplus.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|",
+      "RelativeMoniker": "D:0:0:{810811E3-5C78-4B99-B7A2-C778ABA70320}|XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj|solutionrelative:xunity-llmtranslateplus\\xunity-llmtranslateplus.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "XUnity-LLMTranslatePlus",
+              "DocumentMoniker": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+              "RelativeDocumentMoniker": "XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+              "ToolTip": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+              "RelativeToolTip": "XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-10-09T14:49:18.101Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

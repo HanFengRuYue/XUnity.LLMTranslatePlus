@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Document\\Git\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj": {}
+    "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj": {}
   },
   "projects": {
-    "D:\\Document\\Git\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj": {
+    "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Document\\Git\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+        "projectUniqueName": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
         "projectName": "XUnity-LLMTranslatePlus",
-        "projectPath": "D:\\Document\\Git\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+        "projectPath": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
         "packagesPath": "C:\\Users\\huang\\.nuget\\packages\\",
-        "outputPath": "D:\\Document\\Git\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus\\obj\\",
+        "outputPath": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -26,7 +26,6 @@
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -45,12 +44,20 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "9.0.300"
+        "SdkAnalysisLevel": "10.0.100"
       },
       "frameworks": {
         "net9.0-windows10.0.26100": {
           "targetAlias": "net9.0-windows10.0.26100.0",
           "dependencies": {
+            "CsvHelper": {
+              "target": "Package",
+              "version": "[33.1.0, )"
+            },
+            "Microsoft.Extensions.DependencyInjection": {
+              "target": "Package",
+              "version": "[9.0.9, )"
+            },
             "Microsoft.Windows.SDK.BuildTools": {
               "target": "Package",
               "version": "[10.0.26100.6584, )"
@@ -121,7 +128,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.305/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.100-rc.1.25451.107/PortableRuntimeIdentifierGraph.json"
         }
       },
       "runtimes": {

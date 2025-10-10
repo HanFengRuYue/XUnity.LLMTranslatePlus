@@ -11,14 +11,14 @@
     <PackageArchitecture>x64</PackageArchitecture>
     <PackageIdentityName>007a0bd0-a0e5-4b8f-8033-0c83f742cddd</PackageIdentityName>
     <PackageIdentityPublisher>CN=huang</PackageIdentityPublisher>
-    <IntermediateOutputPath>D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\</IntermediateOutputPath>
+    <IntermediateOutputPath>D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\</IntermediateOutputPath>
     <RemoteDeploymentType>CopyToDevice</RemoteDeploymentType>
     <PackageRegistrationPath>
     </PackageRegistrationPath>
     <RemoveNonLayoutFiles>false</RemoveNonLayoutFiles>
     <DeployOptionalPackages>false</DeployOptionalPackages>
     <WindowsSdkPath>C:\Program Files %28x86%29\Windows Kits\10\</WindowsSdkPath>
-    <LayoutDir>D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\AppX</LayoutDir>
+    <LayoutDir>D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\AppX</LayoutDir>
     <RegisteredManifestChecksum>A6BDC9C2C8820613525D4BCBC3C1F996880BCB6C248D2A235355A3BF79634BE4</RegisteredManifestChecksum>
     <RegisteredPackageMoniker>007a0bd0-a0e5-4b8f-8033-0c83f742cddd_1.0.0.0_x64__1sbe3t2rb8ypa</RegisteredPackageMoniker>
     <RegisteredUserModeAppID>007a0bd0-a0e5-4b8f-8033-0c83f742cddd_1sbe3t2rb8ypa!App</RegisteredUserModeAppID>
@@ -27,24 +27,24 @@
     <RegisteredVersion>1.0.0.0</RegisteredVersion>
   </PropertyGroup>
   <ItemGroup>
-    <AppXManifest Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\AppxManifest.xml">
+    <AppXManifest Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\AppxManifest.xml">
       <PackagePath>AppxManifest.xml</PackagePath>
       <ReRegisterAppIfChanged>true</ReRegisterAppIfChanged>
-      <Modified>2025-10-09T01:39:36.341</Modified>
+      <Modified>2025-10-09T03:42:28.130</Modified>
     </AppXManifest>
   </ItemGroup>
   <ItemGroup>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.runtimeconfig.json">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.runtimeconfig.json">
       <PackagePath>XUnity-LLMTranslatePlus.runtimeconfig.json</PackagePath>
-      <Modified>2025-10-09T01:39:35.627</Modified>
+      <Modified>2025-10-09T03:35:42.856</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\apphost.exe">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\apphost.exe">
       <PackagePath>XUnity-LLMTranslatePlus.exe</PackagePath>
-      <Modified>2025-10-09T01:39:35.143</Modified>
+      <Modified>2025-10-09T03:42:00.940</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.dll">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.dll">
       <PackagePath>XUnity-LLMTranslatePlus.dll</PackagePath>
-      <Modified>2025-10-09T01:39:35.129</Modified>
+      <Modified>2025-10-09T03:42:00.936</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\huang\.nuget\packages\microsoft.netcore.app.runtime.win-x64\9.0.9\runtimes\win-x64\lib\net9.0\Microsoft.CSharp.dll">
       <PackagePath>Microsoft.CSharp.dll</PackagePath>
@@ -934,35 +934,35 @@
       <PackagePath>Microsoft.Windows.AI.MachineLearning.Projection.dll</PackagePath>
       <Modified>2025-09-10T22:33:32.000</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.deps.json">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.deps.json">
       <PackagePath>XUnity-LLMTranslatePlus.deps.json</PackagePath>
-      <Modified>2025-10-09T01:39:35.523</Modified>
+      <Modified>2025-10-09T03:35:42.812</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\LockScreenLogo.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\LockScreenLogo.scale-200.png">
       <PackagePath>Assets\LockScreenLogo.scale-200.png</PackagePath>
       <Modified>2025-10-05T17:15:17.416</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\SplashScreen.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\SplashScreen.scale-200.png">
       <PackagePath>Assets\SplashScreen.scale-200.png</PackagePath>
       <Modified>2025-10-05T17:15:17.416</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square150x150Logo.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square150x150Logo.scale-200.png">
       <PackagePath>Assets\Square150x150Logo.scale-200.png</PackagePath>
       <Modified>2025-10-05T17:15:17.417</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square44x44Logo.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square44x44Logo.scale-200.png">
       <PackagePath>Assets\Square44x44Logo.scale-200.png</PackagePath>
       <Modified>2025-10-05T17:15:17.417</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square44x44Logo.targetsize-24_altform-unplated.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square44x44Logo.targetsize-24_altform-unplated.png">
       <PackagePath>Assets\Square44x44Logo.targetsize-24_altform-unplated.png</PackagePath>
       <Modified>2025-10-05T17:15:17.418</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\StoreLogo.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\StoreLogo.png">
       <PackagePath>Assets\StoreLogo.png</PackagePath>
       <Modified>2025-10-05T17:15:17.418</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Wide310x150Logo.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Wide310x150Logo.scale-200.png">
       <PackagePath>Assets\Wide310x150Logo.scale-200.png</PackagePath>
       <Modified>2025-10-05T17:15:17.419</Modified>
     </AppxPackagedFile>
@@ -970,9 +970,9 @@
       <PackagePath>Microsoft.Web.WebView2.Core.winmd</PackagePath>
       <Modified>2025-03-30T09:03:56.000</Modified>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\resources.pri">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\resources.pri">
       <PackagePath>resources.pri</PackagePath>
-      <Modified>2025-10-09T01:39:35.902</Modified>
+      <Modified>2025-10-09T03:42:01.096</Modified>
     </AppxPackagedFile>
   </ItemGroup>
   <ItemGroup>

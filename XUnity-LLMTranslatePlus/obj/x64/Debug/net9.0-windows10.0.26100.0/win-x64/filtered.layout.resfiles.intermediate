@@ -5,3 +5,12 @@ Assets\Square44x44Logo.scale-200.png
 Assets\Square44x44Logo.targetsize-24_altform-unplated.png
 Assets\StoreLogo.png
 Assets\Wide310x150Logo.scale-200.png
+App.xbf
+MainWindow.xbf
+Resources\Strings.xbf
+Views\ApiConfigPage.xbf
+Views\HomePage.xbf
+Views\LogPage.xbf
+Views\TextEditorPage.xbf
+Views\TranslationSettingsPage.xbf
+ICON.ico

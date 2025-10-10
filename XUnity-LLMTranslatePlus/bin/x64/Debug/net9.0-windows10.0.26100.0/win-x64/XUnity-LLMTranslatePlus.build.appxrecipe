@@ -10,28 +10,28 @@
     <PackageArchitecture>x64</PackageArchitecture>
     <PackageIdentityName>007a0bd0-a0e5-4b8f-8033-0c83f742cddd</PackageIdentityName>
     <PackageIdentityPublisher>CN=huang</PackageIdentityPublisher>
-    <IntermediateOutputPath>D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\</IntermediateOutputPath>
+    <IntermediateOutputPath>D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\</IntermediateOutputPath>
     <RemoteDeploymentType>CopyToDevice</RemoteDeploymentType>
     <PackageRegistrationPath></PackageRegistrationPath>
     <RemoveNonLayoutFiles>false</RemoveNonLayoutFiles>
     <DeployOptionalPackages>false</DeployOptionalPackages>
     <WindowsSdkPath>C:\Program Files %28x86%29\Windows Kits\10\</WindowsSdkPath>
-    <LayoutDir>D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\AppX</LayoutDir>
+    <LayoutDir>D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\AppX</LayoutDir>
   </PropertyGroup>
   <ItemGroup>
-    <AppXManifest Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\AppxManifest.xml">
+    <AppXManifest Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\AppxManifest.xml">
       <PackagePath>AppxManifest.xml</PackagePath>
       <ReRegisterAppIfChanged>true</ReRegisterAppIfChanged>
     </AppXManifest>
   </ItemGroup>
   <ItemGroup>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.runtimeconfig.json">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.runtimeconfig.json">
       <PackagePath>XUnity-LLMTranslatePlus.runtimeconfig.json</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\apphost.exe">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\apphost.exe">
       <PackagePath>XUnity-LLMTranslatePlus.exe</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.dll">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.dll">
       <PackagePath>XUnity-LLMTranslatePlus.dll</PackagePath>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\huang\.nuget\packages\microsoft.netcore.app.runtime.win-x64\9.0.9\runtimes\win-x64\lib\net9.0\Microsoft.CSharp.dll">
@@ -700,34 +700,34 @@
     <AppxPackagedFile Include="C:\Users\huang\.nuget\packages\microsoft.windowsappsdk.ml\1.8.2091\lib\net6.0-windows10.0.17763.0\Microsoft.Windows.AI.MachineLearning.Projection.dll">
       <PackagePath>Microsoft.Windows.AI.MachineLearning.Projection.dll</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.deps.json">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\XUnity-LLMTranslatePlus.deps.json">
       <PackagePath>XUnity-LLMTranslatePlus.deps.json</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\LockScreenLogo.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\LockScreenLogo.scale-200.png">
       <PackagePath>Assets\LockScreenLogo.scale-200.png</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\SplashScreen.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\SplashScreen.scale-200.png">
       <PackagePath>Assets\SplashScreen.scale-200.png</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square150x150Logo.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square150x150Logo.scale-200.png">
       <PackagePath>Assets\Square150x150Logo.scale-200.png</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square44x44Logo.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square44x44Logo.scale-200.png">
       <PackagePath>Assets\Square44x44Logo.scale-200.png</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square44x44Logo.targetsize-24_altform-unplated.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Square44x44Logo.targetsize-24_altform-unplated.png">
       <PackagePath>Assets\Square44x44Logo.targetsize-24_altform-unplated.png</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\StoreLogo.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\StoreLogo.png">
       <PackagePath>Assets\StoreLogo.png</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Wide310x150Logo.scale-200.png">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\Assets\Wide310x150Logo.scale-200.png">
       <PackagePath>Assets\Wide310x150Logo.scale-200.png</PackagePath>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\huang\.nuget\packages\microsoft.web.webview2\1.0.3179.45\build\..\lib\Microsoft.Web.WebView2.Core.winmd">
       <PackagePath>Microsoft.Web.WebView2.Core.winmd</PackagePath>
     </AppxPackagedFile>
-    <AppxPackagedFile Include="D:\Document\Git\XUnity-LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\resources.pri">
+    <AppxPackagedFile Include="D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\resources.pri">
       <PackagePath>resources.pri</PackagePath>
     </AppxPackagedFile>
   </ItemGroup>

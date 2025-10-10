@@ -14,6 +14,46 @@
     </Window.SystemBackdrop>
 
     <Grid>
-
+        <NavigationView
+            x:Name="NavView"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            PaneDisplayMode="Left"
+            SelectionChanged="NavView_SelectionChanged">
+            
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="主页" Tag="Home">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE80F;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                
+                <NavigationViewItem Content="API 配置" Tag="ApiConfig">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE713;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                
+                <NavigationViewItem Content="翻译设置" Tag="TranslationSettings">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE774;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                
+                <NavigationViewItem Content="文本编辑器" Tag="TextEditor">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE70F;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                
+                <NavigationViewItem Content="日志监控" Tag="Log">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE7BA;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            
+            <Frame x:Name="ContentFrame" Padding="24"/>
+        </NavigationView>
     </Grid>
 </Window>

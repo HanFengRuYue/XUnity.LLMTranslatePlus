@@ -1,9 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "kumFS8fSq00=",
+  "dgSpecHash": "LQXgJDKVkLo=",
   "success": true,
-  "projectFilePath": "D:\\Document\\Git\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+  "projectFilePath": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\huang\\.nuget\\packages\\csvhelper\\33.1.0\\csvhelper.33.1.0.nupkg.sha512",
+    "C:\\Users\\huang\\.nuget\\packages\\microsoft.extensions.dependencyinjection\\9.0.9\\microsoft.extensions.dependencyinjection.9.0.9.nupkg.sha512",
+    "C:\\Users\\huang\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\9.0.9\\microsoft.extensions.dependencyinjection.abstractions.9.0.9.nupkg.sha512",
     "C:\\Users\\huang\\.nuget\\packages\\microsoft.web.webview2\\1.0.3179.45\\microsoft.web.webview2.1.0.3179.45.nupkg.sha512",
     "C:\\Users\\huang\\.nuget\\packages\\microsoft.windows.sdk.buildtools\\10.0.26100.6584\\microsoft.windows.sdk.buildtools.10.0.26100.6584.nupkg.sha512",
     "C:\\Users\\huang\\.nuget\\packages\\microsoft.windows.sdk.buildtools.msix\\1.7.20250829.1\\microsoft.windows.sdk.buildtools.msix.1.7.20250829.1.nupkg.sha512",
