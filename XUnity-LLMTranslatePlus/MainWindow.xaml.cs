@@ -28,8 +28,8 @@ namespace XUnity_LLMTranslatePlus
             if (args.SelectedItem is NavigationViewItem selectedItem)
             {
                 string tag = selectedItem.Tag?.ToString() ?? "";
-                
-                Type pageType = tag switch
+
+                Type? pageType = tag switch
                 {
                     "Home" => typeof(HomePage),
                     "ApiConfig" => typeof(ApiConfigPage),

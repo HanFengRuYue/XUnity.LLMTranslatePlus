@@ -11,8 +11,9 @@
         "dependencies": {
           "CsvHelper": "33.1.0",
           "Microsoft.Extensions.DependencyInjection": "9.0.9",
-          "Microsoft.Windows.SDK.BuildTools": "10.0.26100.6584",
+          "Microsoft.Extensions.Http": "9.0.9",
           "Microsoft.WindowsAppSDK": "1.8.250916003",
+          "System.Security.Cryptography.ProtectedData": "9.0.9",
           "Microsoft.Web.WebView2.Core.Projection": "1.0.3179.45",
           "Microsoft.Windows.AI.MachineLearning.Projection": "1.8.2091.16681",
           "runtimepack.Microsoft.NETCore.App.Runtime.win-arm64": "9.0.9",
@@ -769,6 +770,40 @@
           }
         }
       },
+      "Microsoft.Extensions.Configuration/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Primitives": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Configuration.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Configuration.Abstractions/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.Primitives": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Configuration.Abstractions.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Configuration.Binder/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Configuration.Binder.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
       "Microsoft.Extensions.DependencyInjection/9.0.9": {
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.9"
@@ -788,6 +823,106 @@
           }
         }
       },
+      "Microsoft.Extensions.Diagnostics/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.Configuration": "9.0.9",
+          "Microsoft.Extensions.Diagnostics.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Diagnostics.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Diagnostics.Abstractions/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Options": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Diagnostics.Abstractions.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Http/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "9.0.9",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Diagnostics": "9.0.9",
+          "Microsoft.Extensions.Logging": "9.0.9",
+          "Microsoft.Extensions.Logging.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Options": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Http.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Logging/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection": "9.0.9",
+          "Microsoft.Extensions.Logging.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Options": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Logging.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Logging.Abstractions/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Logging.Abstractions.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Options/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Primitives": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Options.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Options.ConfigurationExtensions/9.0.9": {
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Configuration.Binder": "9.0.9",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.9",
+          "Microsoft.Extensions.Options": "9.0.9",
+          "Microsoft.Extensions.Primitives": "9.0.9"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Options.ConfigurationExtensions.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
+      "Microsoft.Extensions.Primitives/9.0.9": {
+        "runtime": {
+          "lib/net9.0/Microsoft.Extensions.Primitives.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
+          }
+        }
+      },
       "Microsoft.Web.WebView2/1.0.3179.45": {
         "native": {
           "runtimes/win-arm64/native/WebView2Loader.dll": {
@@ -795,24 +930,18 @@
           }
         }
       },
-      "Microsoft.Windows.SDK.BuildTools/10.0.26100.6584": {},
-      "Microsoft.Windows.SDK.BuildTools.MSIX/1.7.20250829.1": {},
       "Microsoft.WindowsAppSDK/1.8.250916003": {
         "dependencies": {
           "Microsoft.WindowsAppSDK.AI": "1.8.38",
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001",
-          "Microsoft.WindowsAppSDK.DWrite": "1.8.25090401",
           "Microsoft.WindowsAppSDK.Foundation": "1.8.250906002",
           "Microsoft.WindowsAppSDK.InteractiveExperiences": "1.8.250906004",
           "Microsoft.WindowsAppSDK.ML": "1.8.2091",
-          "Microsoft.WindowsAppSDK.Runtime": "1.8.250916003",
           "Microsoft.WindowsAppSDK.Widgets": "1.8.250904007",
           "Microsoft.WindowsAppSDK.WinUI": "1.8.250906003"
         }
       },
       "Microsoft.WindowsAppSDK.AI/1.8.38": {
         "dependencies": {
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001",
           "Microsoft.WindowsAppSDK.Foundation": "1.8.250906002"
         },
         "runtime": {
@@ -842,20 +971,8 @@
           }
         }
       },
-      "Microsoft.WindowsAppSDK.Base/1.8.250831001": {
-        "dependencies": {
-          "Microsoft.Windows.SDK.BuildTools": "10.0.26100.6584",
-          "Microsoft.Windows.SDK.BuildTools.MSIX": "1.7.20250829.1"
-        }
-      },
-      "Microsoft.WindowsAppSDK.DWrite/1.8.25090401": {
-        "dependencies": {
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001"
-        }
-      },
       "Microsoft.WindowsAppSDK.Foundation/1.8.250906002": {
         "dependencies": {
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001",
           "Microsoft.WindowsAppSDK.InteractiveExperiences": "1.8.250906004"
         },
         "runtime": {
@@ -946,9 +1063,6 @@
         }
       },
       "Microsoft.WindowsAppSDK.InteractiveExperiences/1.8.250906004": {
-        "dependencies": {
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001"
-        },
         "runtime": {
           "lib/net6.0-windows10.0.18362.0/Microsoft.InteractiveExperiences.Projection.dll": {
             "assemblyVersion": "10.0.0.0",
@@ -958,7 +1072,6 @@
       },
       "Microsoft.WindowsAppSDK.ML/1.8.2091": {
         "dependencies": {
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001",
           "Microsoft.WindowsAppSDK.Foundation": "1.8.250906002"
         },
         "runtime": {
@@ -973,15 +1086,7 @@
           }
         }
       },
-      "Microsoft.WindowsAppSDK.Runtime/1.8.250916003": {
-        "dependencies": {
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001"
-        }
-      },
       "Microsoft.WindowsAppSDK.Widgets/1.8.250904007": {
-        "dependencies": {
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001"
-        },
         "runtime": {
           "lib/net6.0-windows10.0.17763.0/Microsoft.Windows.Widgets.Projection.dll": {
             "assemblyVersion": "1.0.0.0",
@@ -992,7 +1097,6 @@
       "Microsoft.WindowsAppSDK.WinUI/1.8.250906003": {
         "dependencies": {
           "Microsoft.Web.WebView2": "1.0.3179.45",
-          "Microsoft.WindowsAppSDK.Base": "1.8.250831001",
           "Microsoft.WindowsAppSDK.Foundation": "1.8.250906002",
           "Microsoft.WindowsAppSDK.InteractiveExperiences": "1.8.250906004"
         },
@@ -1000,6 +1104,14 @@
           "lib/net6.0-windows10.0.17763.0/Microsoft.WinUI.dll": {
             "assemblyVersion": "3.0.0.0",
             "fileVersion": "3.0.0.2509"
+          }
+        }
+      },
+      "System.Security.Cryptography.ProtectedData/9.0.9": {
+        "runtime": {
+          "lib/net9.0/System.Security.Cryptography.ProtectedData.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.925.41916"
           }
         }
       },
@@ -1044,6 +1156,27 @@
       "path": "csvhelper/33.1.0",
       "hashPath": "csvhelper.33.1.0.nupkg.sha512"
     },
+    "Microsoft.Extensions.Configuration/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-w87wF/90/VI0ZQBhf4rbMEeyEy0vi2WKjFmACsNAKNaorY+ZlVz7ddyXkbADvaWouMKffNmR0yQOGcrvSSvKGg==",
+      "path": "microsoft.extensions.configuration/9.0.9",
+      "hashPath": "microsoft.extensions.configuration.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Configuration.Abstractions/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-p5RKAY9POvs3axwA/AQRuJeM8AHuE8h4qbP1NxQeGm0ep46aXz1oCLAp/oOYxX1GsjStgdhHrN3XXLLXr0+b3w==",
+      "path": "microsoft.extensions.configuration.abstractions/9.0.9",
+      "hashPath": "microsoft.extensions.configuration.abstractions.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Configuration.Binder/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-6SIp/6Bngk4jm2W36JekZbiIbFPdE/eMUtrJEqIqHGpd1zar3jvgnwxnpWQfzUiGrkyY8q8s6V82zkkEZozghA==",
+      "path": "microsoft.extensions.configuration.binder/9.0.9",
+      "hashPath": "microsoft.extensions.configuration.binder.9.0.9.nupkg.sha512"
+    },
     "Microsoft.Extensions.DependencyInjection/9.0.9": {
       "type": "package",
       "serviceable": true,
@@ -1058,26 +1191,68 @@
       "path": "microsoft.extensions.dependencyinjection.abstractions/9.0.9",
       "hashPath": "microsoft.extensions.dependencyinjection.abstractions.9.0.9.nupkg.sha512"
     },
+    "Microsoft.Extensions.Diagnostics/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-gtzl9SD6CvFYOb92qEF41Z9rICzYniM342TWbbJwN3eLS6a5fCLFvO1pQGtpMSnP3h1zHXupMEeKSA9musWYCQ==",
+      "path": "microsoft.extensions.diagnostics/9.0.9",
+      "hashPath": "microsoft.extensions.diagnostics.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Diagnostics.Abstractions/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-YHGmxccrVZ2Ar3eI+/NdbOHkd1/HzrHvmQ5yBsp0Gl7jTyBe6qcXNYjUt9v9JIO+Z14la44+YYEe63JSqs1fYg==",
+      "path": "microsoft.extensions.diagnostics.abstractions/9.0.9",
+      "hashPath": "microsoft.extensions.diagnostics.abstractions.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Http/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-dTmh5Rj4/WpirsN1PDs8YhyaodgtzxWqPKaT+B3Zn72uHKLJOuxIt06HTea126eEDWHYSLNN61I4snw7PuerFg==",
+      "path": "microsoft.extensions.http/9.0.9",
+      "hashPath": "microsoft.extensions.http.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Logging/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-MaCB0Y9hNDs4YLu3HCJbo199WnJT8xSgajG1JYGANz9FkseQ5f3v/llu3HxLI6mjDlu7pa7ps9BLPWjKzsAAzQ==",
+      "path": "microsoft.extensions.logging/9.0.9",
+      "hashPath": "microsoft.extensions.logging.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Logging.Abstractions/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-FEgpSF+Z9StMvrsSViaybOBwR0f0ZZxDm8xV5cSOFiXN/t+ys+rwAlTd/6yG7Ld1gfppgvLcMasZry3GsI9lGA==",
+      "path": "microsoft.extensions.logging.abstractions/9.0.9",
+      "hashPath": "microsoft.extensions.logging.abstractions.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Options/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-loxGGHE1FC2AefwPHzrjPq7X92LQm64qnU/whKfo6oWaceewPUVYQJBJs3S3E2qlWwnCpeZ+dGCPTX+5dgVAuQ==",
+      "path": "microsoft.extensions.options/9.0.9",
+      "hashPath": "microsoft.extensions.options.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Options.ConfigurationExtensions/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-n4DCdnn2qs6V5U06Sx62FySEAZsJiJJgOzrPHDh9hPK7c2W8hEabC76F3Re3tGPjpiKa02RvB6FxZyxo8iICzg==",
+      "path": "microsoft.extensions.options.configurationextensions/9.0.9",
+      "hashPath": "microsoft.extensions.options.configurationextensions.9.0.9.nupkg.sha512"
+    },
+    "Microsoft.Extensions.Primitives/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-z4pyMePOrl733ltTowbN565PxBw1oAr8IHmIXNDiDqd22nFpYltX9KhrNC/qBWAG1/Zx5MHX+cOYhWJQYCO/iw==",
+      "path": "microsoft.extensions.primitives/9.0.9",
+      "hashPath": "microsoft.extensions.primitives.9.0.9.nupkg.sha512"
+    },
     "Microsoft.Web.WebView2/1.0.3179.45": {
       "type": "package",
       "serviceable": true,
       "sha512": "sha512-3pokSH5CnN0G6rGhGFo1y87inxYhNxBQ2Vdf0wlvBj99KHxQJormjDACmqRnFeUsmuNFIhWwfAL1ztq7wD5qRA==",
       "path": "microsoft.web.webview2/1.0.3179.45",
       "hashPath": "microsoft.web.webview2.1.0.3179.45.nupkg.sha512"
-    },
-    "Microsoft.Windows.SDK.BuildTools/10.0.26100.6584": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-EUt+urbMmyBgDX7CA/8eUZRAzi5CKUHyLvQnKkmCUBgpsgaquGb6/XAORzKy6zy/zbu5RoeTxQP9TSntpP3ETw==",
-      "path": "microsoft.windows.sdk.buildtools/10.0.26100.6584",
-      "hashPath": "microsoft.windows.sdk.buildtools.10.0.26100.6584.nupkg.sha512"
-    },
-    "Microsoft.Windows.SDK.BuildTools.MSIX/1.7.20250829.1": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-IMdvRmCIZnBS5GkYnv0po1bcx6U1OF39pqA4TphQ9evDzpCRoSE19/PkDvlUNNrBavTsLIEJgd/TAIFner75ow==",
-      "path": "microsoft.windows.sdk.buildtools.msix/1.7.20250829.1",
-      "hashPath": "microsoft.windows.sdk.buildtools.msix.1.7.20250829.1.nupkg.sha512"
     },
     "Microsoft.WindowsAppSDK/1.8.250916003": {
       "type": "package",
@@ -1092,20 +1267,6 @@
       "sha512": "sha512-6qTuu2DLprytb+yx8bKUDJLtp4CELeVcQo6JyhJYOjj1cGzOGLnweQKg+OuwkX1u/LVJGDjnad5TAjU7mEoeSw==",
       "path": "microsoft.windowsappsdk.ai/1.8.38",
       "hashPath": "microsoft.windowsappsdk.ai.1.8.38.nupkg.sha512"
-    },
-    "Microsoft.WindowsAppSDK.Base/1.8.250831001": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-8LlfXBS2Hpw+OoVXViJmIOPXl0nMbqMaFR3j6+QHFNc62VULwPEcXiMRcP2WbV/+mtC7W2LH6yx6uu/Hrr9lVw==",
-      "path": "microsoft.windowsappsdk.base/1.8.250831001",
-      "hashPath": "microsoft.windowsappsdk.base.1.8.250831001.nupkg.sha512"
-    },
-    "Microsoft.WindowsAppSDK.DWrite/1.8.25090401": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-WJ0p9yMgiNYqU2O5ZKCXcb7FBjryIUUopgeYMvnlf1yBUYgdjMFMkoJqYVqkz866wnntiB2IZhLxEzhFzvVs1A==",
-      "path": "microsoft.windowsappsdk.dwrite/1.8.25090401",
-      "hashPath": "microsoft.windowsappsdk.dwrite.1.8.25090401.nupkg.sha512"
     },
     "Microsoft.WindowsAppSDK.Foundation/1.8.250906002": {
       "type": "package",
@@ -1128,13 +1289,6 @@
       "path": "microsoft.windowsappsdk.ml/1.8.2091",
       "hashPath": "microsoft.windowsappsdk.ml.1.8.2091.nupkg.sha512"
     },
-    "Microsoft.WindowsAppSDK.Runtime/1.8.250916003": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-y58FxcrVDOJyhh+4kl6cTCaaAh2cLEDU/LIDvYX4Se6aiA1NkuvJ4XicaOPXdkIWl8pi15hj5PWqoMlYUQr1Cg==",
-      "path": "microsoft.windowsappsdk.runtime/1.8.250916003",
-      "hashPath": "microsoft.windowsappsdk.runtime.1.8.250916003.nupkg.sha512"
-    },
     "Microsoft.WindowsAppSDK.Widgets/1.8.250904007": {
       "type": "package",
       "serviceable": true,
@@ -1148,6 +1302,13 @@
       "sha512": "sha512-6oskwUluqlDGwUcwYlY3GWTMLajyjh9e790SmWzCCMDRV6sunYbqp7DkiSLzn8nhgSbGvmj6zG92JnkYRlbrXw==",
       "path": "microsoft.windowsappsdk.winui/1.8.250906003",
       "hashPath": "microsoft.windowsappsdk.winui.1.8.250906003.nupkg.sha512"
+    },
+    "System.Security.Cryptography.ProtectedData/9.0.9": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-XN37933FTzEkqGJoOTunvnvzAv/4VO/9wQ0QwsGcrR5KyQpYT0z4Ssm+f+fpY9bea6srypFp3JjNPHHC26xzLw==",
+      "path": "system.security.cryptography.protecteddata/9.0.9",
+      "hashPath": "system.security.cryptography.protecteddata.9.0.9.nupkg.sha512"
     },
     "Microsoft.Web.WebView2.Core.Projection/1.0.3179.45": {
       "type": "reference",

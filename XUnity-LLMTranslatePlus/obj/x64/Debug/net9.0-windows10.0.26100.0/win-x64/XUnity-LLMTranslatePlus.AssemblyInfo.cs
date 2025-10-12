@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("XUnity-LLMTranslatePlus")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1869918fc8a7f2e9a6fdf2911789e2b9589eac9d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+506c4c1ca67572f511cc6d54b98fd7cc1b8501df")]
 [assembly: System.Reflection.AssemblyProductAttribute("XUnity-LLMTranslatePlus")]
 [assembly: System.Reflection.AssemblyTitleAttribute("XUnity-LLMTranslatePlus")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

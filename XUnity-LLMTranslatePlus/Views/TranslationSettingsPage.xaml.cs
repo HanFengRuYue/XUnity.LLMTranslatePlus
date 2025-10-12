@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Windows.Storage.Pickers;
 using XUnity_LLMTranslatePlus.Models;
 using XUnity_LLMTranslatePlus.Services;
+using Microsoft.UI.Dispatching;
 
 namespace XUnity_LLMTranslatePlus.Views
 {
@@ -16,6 +17,8 @@ namespace XUnity_LLMTranslatePlus.Views
         private readonly ConfigService? _configService;
         private readonly LogService? _logService;
         private AppConfig? _currentConfig;
+        private DispatcherQueueTimer? _autoSaveTimer;
+        private bool _isLoadingConfig = false;
 
         public TranslationSettingsPage()
         {
@@ -24,11 +27,21 @@ namespace XUnity_LLMTranslatePlus.Views
             _configService = App.GetService<ConfigService>();
             _logService = App.GetService<LogService>();
 
+            // 初始化自动保存定时器（防抖：500ms 后保存）
+            _autoSaveTimer = DispatcherQueue.CreateTimer();
+            _autoSaveTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _autoSaveTimer.Tick += (s, e) =>
+            {
+                _autoSaveTimer.Stop();
+                _ = AutoSaveConfigAsync();
+            };
+
             LoadConfiguration();
         }
 
         private async void LoadConfiguration()
         {
+            _isLoadingConfig = true;
             try
             {
                 if (_configService != null)
@@ -40,6 +53,10 @@ namespace XUnity_LLMTranslatePlus.Views
             catch (Exception ex)
             {
                 _logService?.Log($"加载翻译设置失败: {ex.Message}", LogLevel.Error);
+            }
+            finally
+            {
+                _isLoadingConfig = false;
             }
         }
 
@@ -63,10 +80,12 @@ namespace XUnity_LLMTranslatePlus.Views
             }
         }
 
-        private AppConfig GetConfigFromUI()
+        private async System.Threading.Tasks.Task<AppConfig> GetConfigFromUIAsync()
         {
-            var config = _currentConfig ?? new AppConfig();
+            // 始终从 ConfigService 获取最新配置，确保不丢失其他页面的设置
+            var config = await _configService!.LoadConfigAsync();
 
+            // 只更新当前页面相关的字段
             config.GameDirectory = GameDirectoryTextBox.Text;
             config.AutoDetectPath = AutoDetectPathToggle.IsOn;
             config.TargetLanguage = TargetLanguageComboBox.Text;
@@ -84,10 +103,10 @@ namespace XUnity_LLMTranslatePlus.Views
         private async void BrowseGameDirButton_Click(object sender, RoutedEventArgs e)
         {
             var folderPicker = new FolderPicker();
-            
+
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
             WinRT.Interop.InitializeWithWindow.Initialize(folderPicker, hwnd);
-            
+
             folderPicker.SuggestedStartLocation = PickerLocationId.ComputerFolder;
             folderPicker.FileTypeFilter.Add("*");
 
@@ -95,11 +114,14 @@ namespace XUnity_LLMTranslatePlus.Views
             if (folder != null)
             {
                 GameDirectoryTextBox.Text = folder.Path;
-                
+
                 if (AutoDetectPathToggle.IsOn)
                 {
                     DetectTranslationPath(folder.Path);
                 }
+
+                // 自动保存
+                TriggerAutoSave();
             }
         }
 
@@ -124,6 +146,7 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 MonitorIntervalPanel.Visibility = RealTimeMonitoringToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
             }
+            TriggerAutoSave();
         }
 
         private void EnableContextToggle_Toggled(object sender, RoutedEventArgs e)
@@ -132,6 +155,7 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 ContextConfigPanel.Visibility = EnableContextToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
             }
+            TriggerAutoSave();
         }
 
         private void ContextWeightSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
@@ -140,44 +164,74 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 ContextWeightValueText.Text = e.NewValue.ToString("F1");
             }
+            TriggerAutoSave();
         }
 
-        private async void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// 触发自动保存（带防抖）
+        /// </summary>
+        private void TriggerAutoSave()
         {
-            if (_configService == null)
-            {
-                return;
-            }
+            if (_isLoadingConfig || _configService == null) return;
+
+            // 重启定时器（防抖）
+            _autoSaveTimer?.Stop();
+            _autoSaveTimer?.Start();
+        }
+
+        /// <summary>
+        /// 自动保存配置
+        /// </summary>
+        private async System.Threading.Tasks.Task AutoSaveConfigAsync()
+        {
+            if (_configService == null) return;
 
             try
             {
-                var config = GetConfigFromUI();
+                // 从 UI 获取配置（内部会加载完整配置并只更新翻译相关字段）
+                var config = await GetConfigFromUIAsync();
                 await _configService.SaveConfigAsync(config);
 
-                _logService?.Log("翻译设置已保存", LogLevel.Info);
+                // 更新本地缓存
+                _currentConfig = config;
 
-                ContentDialog dialog = new ContentDialog
-                {
-                    Title = "保存成功",
-                    Content = "翻译设置已保存！",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await dialog.ShowAsync();
+                _logService?.Log("翻译设置已自动保存", LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                _logService?.Log($"保存翻译设置失败: {ex.Message}", LogLevel.Error);
-
-                ContentDialog dialog = new ContentDialog
-                {
-                    Title = "保存失败",
-                    Content = $"保存失败: {ex.Message}",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await dialog.ShowAsync();
+                _logService?.Log($"自动保存翻译设置失败: {ex.Message}", LogLevel.Error);
             }
+        }
+
+        // 控件事件处理函数
+        private void AutoDetectPathToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            TriggerAutoSave();
+        }
+
+        private void TargetLanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            TriggerAutoSave();
+        }
+
+        private void SourceLanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            TriggerAutoSave();
+        }
+
+        private void MonitorIntervalNumberBox_ValueChanged(Microsoft.UI.Xaml.Controls.NumberBox sender, Microsoft.UI.Xaml.Controls.NumberBoxValueChangedEventArgs args)
+        {
+            TriggerAutoSave();
+        }
+
+        private void ContextLinesNumberBox_ValueChanged(Microsoft.UI.Xaml.Controls.NumberBox sender, Microsoft.UI.Xaml.Controls.NumberBoxValueChangedEventArgs args)
+        {
+            TriggerAutoSave();
+        }
+
+        private void EnableCacheToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            TriggerAutoSave();
         }
     }
 }

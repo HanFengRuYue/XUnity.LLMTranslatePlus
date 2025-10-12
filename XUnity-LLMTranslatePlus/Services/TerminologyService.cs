@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using CsvHelper;
 using CsvHelper.Configuration;
 using XUnity_LLMTranslatePlus.Models;
+using XUnity_LLMTranslatePlus.Utils;
 
 namespace XUnity_LLMTranslatePlus.Services
 {
@@ -52,9 +53,12 @@ namespace XUnity_LLMTranslatePlus.Services
         {
             string path = filePath ?? DefaultTermsFilePath;
 
+            // 验证文件路径
+            string validatedPath = PathValidator.ValidateAndNormalizePath(path);
+
             try
             {
-                if (File.Exists(path))
+                if (File.Exists(validatedPath))
                 {
                     var config = new CsvConfiguration(CultureInfo.InvariantCulture)
                     {
@@ -62,7 +66,7 @@ namespace XUnity_LLMTranslatePlus.Services
                         Encoding = Encoding.UTF8
                     };
 
-                    using var reader = new StreamReader(path, Encoding.UTF8);
+                    using var reader = new StreamReader(validatedPath, Encoding.UTF8);
                     using var csv = new CsvReader(reader, config);
 
                     var records = csv.GetRecords<Term>().ToList();
@@ -86,7 +90,7 @@ namespace XUnity_LLMTranslatePlus.Services
                     {
                         _terms = new List<Term>();
                     }
-                    await SaveTermsAsync(path);
+                    await SaveTermsAsync(validatedPath);
                     
                     // 只在首次加载时记录日志
                     if (!_hasLogged)
@@ -113,6 +117,9 @@ namespace XUnity_LLMTranslatePlus.Services
         {
             string path = filePath ?? DefaultTermsFilePath;
 
+            // 验证文件路径
+            string validatedPath = PathValidator.ValidateAndNormalizePath(path);
+
             try
             {
                 var config = new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -127,7 +134,7 @@ namespace XUnity_LLMTranslatePlus.Services
                     termsToSave = _terms.ToList();
                 }
 
-                using var writer = new StreamWriter(path, false, Encoding.UTF8);
+                using var writer = new StreamWriter(validatedPath, false, Encoding.UTF8);
                 using var csv = new CsvWriter(writer, config);
 
                 await csv.WriteRecordsAsync(termsToSave);
@@ -205,6 +212,10 @@ namespace XUnity_LLMTranslatePlus.Services
         /// </summary>
         public async Task<int> ImportCsvAsync(string filePath)
         {
+            // 验证文件路径
+            PathValidator.ValidateFileExists(filePath);
+            string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
+
             try
             {
                 var config = new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -213,7 +224,7 @@ namespace XUnity_LLMTranslatePlus.Services
                     Encoding = Encoding.UTF8
                 };
 
-                using var reader = new StreamReader(filePath, Encoding.UTF8);
+                using var reader = new StreamReader(validatedPath, Encoding.UTF8);
                 using var csv = new CsvReader(reader, config);
 
                 var importedTerms = csv.GetRecords<Term>().ToList();

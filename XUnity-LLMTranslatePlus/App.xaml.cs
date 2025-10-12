@@ -30,6 +30,9 @@ namespace XUnity_LLMTranslatePlus
         {
             var services = new ServiceCollection();
 
+            // 注册 HttpClient 工厂（.NET 最佳实践）
+            services.AddHttpClient();
+
             // 注册所有服务为单例
             services.AddSingleton<LogService>();
             services.AddSingleton<ConfigService>();

@@ -7,20 +7,48 @@ namespace XUnity_LLMTranslatePlus.Utils
     /// <summary>
     /// 转义字符处理工具
     /// </summary>
-    public class EscapeCharacterHandler
+    public partial class EscapeCharacterHandler
     {
-        // 特殊字符模式
-        private static readonly List<string> SpecialPatterns = new List<string>
+        // 使用源生成器的 Regex 模式（.NET 7+ 性能优化）
+        [GeneratedRegex(@"\\n", RegexOptions.Compiled)]
+        private static partial Regex NewlineRegex();
+
+        [GeneratedRegex(@"\\r", RegexOptions.Compiled)]
+        private static partial Regex CarriageReturnRegex();
+
+        [GeneratedRegex(@"\\t", RegexOptions.Compiled)]
+        private static partial Regex TabRegex();
+
+        [GeneratedRegex(@"\\\\", RegexOptions.Compiled)]
+        private static partial Regex BackslashRegex();
+
+        [GeneratedRegex(@"\\""", RegexOptions.Compiled)]
+        private static partial Regex DoubleQuoteRegex();
+
+        [GeneratedRegex(@"\\'", RegexOptions.Compiled)]
+        private static partial Regex SingleQuoteRegex();
+
+        [GeneratedRegex(@"\{\d+\}", RegexOptions.Compiled)]
+        private static partial Regex PlaceholderRegex();
+
+        [GeneratedRegex(@"<[^>]+>", RegexOptions.Compiled)]
+        private static partial Regex HtmlTagRegex();
+
+        [GeneratedRegex(@"\[.*?\]", RegexOptions.Compiled)]
+        private static partial Regex BracketRegex();
+
+        // 特殊字符模式和对应的 Regex 生成器
+        private static readonly List<(string Pattern, Func<Regex> RegexFactory, int Priority)> SpecialPatterns = new()
         {
-            @"\\n",      // 换行
-            @"\\r",      // 回车
-            @"\\t",      // 制表符
-            @"\\\\",     // 反斜杠
-            @"\\\""",    // 双引号
-            @"\\\'",     // 单引号
-            @"\{\\d+\}", // {0}, {1}, {2} 等占位符
-            @"<[^>]+>",  // HTML/Unity 标签，如 <color=red>, <size=14>
-            @"\[.*?\]",  // 方括号标记，如 [item]
+            (@"\\n", () => NewlineRegex(), 0),
+            (@"\\r", () => CarriageReturnRegex(), 1),
+            (@"\\t", () => TabRegex(), 2),
+            (@"\\\\", () => BackslashRegex(), 3),
+            (@"\\""", () => DoubleQuoteRegex(), 4),
+            (@"\\'", () => SingleQuoteRegex(), 5),
+            (@"\{\d+\}", () => PlaceholderRegex(), 6),
+            (@"<[^>]+>", () => HtmlTagRegex(), 7),
+            (@"\[.*?\]", () => BracketRegex(), 8),
         };
 
         /// <summary>
@@ -56,13 +84,14 @@ namespace XUnity_LLMTranslatePlus.Utils
             var allMatches = new List<(Match match, int priority)>();
             int placeholderIndex = 0;
 
-            // 收集所有模式的匹配项，按优先级排序
-            for (int i = 0; i < SpecialPatterns.Count; i++)
+            // 收集所有模式的匹配项，按优先级排序（使用源生成的 Regex）
+            foreach (var (pattern, regexFactory, priority) in SpecialPatterns)
             {
-                var matches = Regex.Matches(text, SpecialPatterns[i]);
+                var regex = regexFactory();
+                var matches = regex.Matches(text);
                 foreach (Match match in matches)
                 {
-                    allMatches.Add((match, i));
+                    allMatches.Add((match, priority));
                 }
             }
 
@@ -203,9 +232,10 @@ namespace XUnity_LLMTranslatePlus.Utils
                 return false;
             }
 
-            foreach (var pattern in SpecialPatterns)
+            foreach (var (pattern, regexFactory, priority) in SpecialPatterns)
             {
-                if (Regex.IsMatch(text, pattern))
+                var regex = regexFactory();
+                if (regex.IsMatch(text))
                 {
                     return true;
                 }
@@ -225,9 +255,10 @@ namespace XUnity_LLMTranslatePlus.Utils
             }
 
             int count = 0;
-            foreach (var pattern in SpecialPatterns)
+            foreach (var (pattern, regexFactory, priority) in SpecialPatterns)
             {
-                count += Regex.Matches(text, pattern).Count;
+                var regex = regexFactory();
+                count += regex.Matches(text).Count;
             }
 
             return count;

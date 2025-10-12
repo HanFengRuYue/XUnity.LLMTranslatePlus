@@ -44,7 +44,7 @@ namespace XUnity_LLMTranslatePlus.Services
         /// <summary>
         /// 翻译单条文本
         /// </summary>
-        public async Task<string> TranslateTextAsync(string originalText, AppConfig? config = null)
+        public async Task<string> TranslateTextAsync(string originalText, AppConfig? config = null, CancellationToken cancellationToken = default)
         {
             config ??= _configService.GetCurrentConfig();
 
@@ -52,6 +52,9 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 return originalText;
             }
+
+            // 检查取消请求
+            cancellationToken.ThrowIfCancellationRequested();
 
             try
             {
@@ -92,7 +95,7 @@ namespace XUnity_LLMTranslatePlus.Services
                 await _logService.LogAsync($"开始翻译: {originalText}", LogLevel.Debug);
 
                 // 5. 调用 API 翻译
-                string translatedText = await _apiClient.TranslateAsync(textToTranslate, systemPrompt, config);
+                string translatedText = await _apiClient.TranslateAsync(textToTranslate, systemPrompt, config, cancellationToken);
 
                 await _logService.LogAsync($"[API返回] {translatedText}", LogLevel.Info);
 
@@ -130,25 +133,33 @@ namespace XUnity_LLMTranslatePlus.Services
         /// <summary>
         /// 批量翻译文本
         /// </summary>
-        public async Task<Dictionary<string, string>> TranslateBatchAsync(List<string> texts, AppConfig? config = null)
+        public async Task<Dictionary<string, string>> TranslateBatchAsync(List<string> texts, AppConfig? config = null, CancellationToken cancellationToken = default)
         {
             config ??= _configService.GetCurrentConfig();
 
             var results = new Dictionary<string, string>();
-            
+
+            // 检查取消请求
+            cancellationToken.ThrowIfCancellationRequested();
+
             // 使用局部信号量以控制并发，避免多次调用冲突
             using var semaphore = new SemaphoreSlim(config.MaxConcurrentTranslations, config.MaxConcurrentTranslations);
 
             var tasks = texts.Select(async text =>
             {
-                await semaphore.WaitAsync();
+                await semaphore.WaitAsync(cancellationToken);
                 try
                 {
-                    string translated = await TranslateTextAsync(text, config);
+                    string translated = await TranslateTextAsync(text, config, cancellationToken);
                     lock (results)
                     {
                         results[text] = translated;
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    // 取消操作，重新抛出
+                    throw;
                 }
                 catch (Exception ex)
                 {

@@ -32,21 +32,20 @@ namespace XUnity_LLMTranslatePlus.Services
         /// </summary>
         public async Task<List<TranslationEntry>> LoadFileAsync(string filePath)
         {
-            if (!File.Exists(filePath))
-            {
-                throw new FileNotFoundException($"文件不存在: {filePath}");
-            }
+            // 验证文件路径
+            PathValidator.ValidateFileExists(filePath);
+            string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
 
             try
             {
-                await _logService.LogAsync($"正在加载文件: {filePath}", LogLevel.Info);
+                await _logService.LogAsync($"正在加载文件: {validatedPath}", LogLevel.Info);
 
                 _parser = new TextFileParser();
-                var entries = await _parser.ParseFileAsync(filePath);
+                var entries = await _parser.ParseFileAsync(validatedPath);
 
                 lock (_lockObject)
                 {
-                    _currentFilePath = filePath;
+                    _currentFilePath = validatedPath;
                     _entries = entries;
                 }
 
@@ -68,7 +67,11 @@ namespace XUnity_LLMTranslatePlus.Services
         /// </summary>
         public async Task<List<TranslationEntry>> LoadFromGameDirectoryAsync(string gameDirectory)
         {
-            string? filePath = FindTranslationFile(gameDirectory);
+            // 验证游戏目录路径
+            PathValidator.ValidateDirectoryExists(gameDirectory);
+            string validatedGameDir = PathValidator.ValidateAndNormalizePath(gameDirectory);
+
+            string? filePath = FindTranslationFile(validatedGameDir);
 
             if (filePath == null)
             {

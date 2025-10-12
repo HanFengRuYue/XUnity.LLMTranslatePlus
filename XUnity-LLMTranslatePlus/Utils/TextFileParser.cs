@@ -4,7 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using XUnity_LLMTranslatePlus.Exceptions;
 using XUnity_LLMTranslatePlus.Models;
 
 namespace XUnity_LLMTranslatePlus.Utils
@@ -101,18 +103,17 @@ namespace XUnity_LLMTranslatePlus.Utils
         /// <summary>
         /// 解析文件
         /// </summary>
-        public async Task<List<TranslationEntry>> ParseFileAsync(string filePath)
+        public async Task<List<TranslationEntry>> ParseFileAsync(string filePath, CancellationToken cancellationToken = default)
         {
             var entries = new List<TranslationEntry>();
 
-            if (!File.Exists(filePath))
-            {
-                throw new FileNotFoundException($"文件不存在: {filePath}");
-            }
+            // 验证文件路径
+            PathValidator.ValidateFileExists(filePath);
+            string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
 
             try
             {
-                var lines = await File.ReadAllLinesAsync(filePath, Encoding.UTF8);
+                var lines = await File.ReadAllLinesAsync(validatedPath, Encoding.UTF8, cancellationToken);
                 
                 lock (_lockObject)
                 {
@@ -132,14 +133,18 @@ namespace XUnity_LLMTranslatePlus.Utils
                     int separatorIndex = line.IndexOf('=');
                     if (separatorIndex > 0)
                     {
-                        string key = line.Substring(0, separatorIndex).Trim();
-                        string value = line.Substring(separatorIndex + 1).Trim();
+                        // 使用 Span<char> 优化字符串操作，减少内存分配
+                        ReadOnlySpan<char> lineSpan = line.AsSpan();
+                        string key = lineSpan.Slice(0, separatorIndex).Trim().ToString();
+                        ReadOnlySpan<char> valueSpan = lineSpan.Slice(separatorIndex + 1).Trim();
 
                         // 移除可能的引号
-                        if (value.StartsWith("\"") && value.EndsWith("\""))
+                        if (valueSpan.Length >= 2 && valueSpan[0] == '"' && valueSpan[^1] == '"')
                         {
-                            value = value.Substring(1, value.Length - 2);
+                            valueSpan = valueSpan.Slice(1, valueSpan.Length - 2);
                         }
+
+                        string value = valueSpan.ToString();
 
                         var entry = new TranslationEntry
                         {
@@ -161,7 +166,11 @@ namespace XUnity_LLMTranslatePlus.Utils
             }
             catch (Exception ex)
             {
-                throw new Exception($"解析文件失败: {ex.Message}", ex);
+                throw new FileOperationException(
+                    $"解析文件失败: {ex.Message}",
+                    ex,
+                    filePath,
+                    "Parse");
             }
 
             return entries;
@@ -203,8 +212,11 @@ namespace XUnity_LLMTranslatePlus.Utils
         /// <summary>
         /// 保存文件
         /// </summary>
-        public async Task SaveFileAsync(string filePath)
+        public async Task SaveFileAsync(string filePath, CancellationToken cancellationToken = default)
         {
+            // 验证文件路径
+            string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
+
             try
             {
                 var outputLines = new List<string>();
@@ -224,19 +236,19 @@ namespace XUnity_LLMTranslatePlus.Utils
                         int separatorIndex = line.IndexOf('=');
                         if (separatorIndex > 0)
                         {
-                            string key = line.Substring(0, separatorIndex).Trim();
+                            // 使用 Span<char> 优化
+                            ReadOnlySpan<char> lineSpan = line.AsSpan();
+                            string key = lineSpan.Slice(0, separatorIndex).Trim().ToString();
 
                             // 如果有更新的翻译，使用新的值
-                            if (_translations.ContainsKey(key))
+                            if (_translations.TryGetValue(key, out string? newValue))
                             {
-                                string newValue = _translations[key];
-                                
                                 // 保持原始格式（是否有引号）
                                 bool hasQuotes = line.Contains("\"");
                                 string newLine = hasQuotes
                                     ? $"{key}=\"{newValue}\""
                                     : $"{key}={newValue}";
-                                
+
                                 outputLines.Add(newLine);
                             }
                             else
@@ -253,11 +265,15 @@ namespace XUnity_LLMTranslatePlus.Utils
                     }
                 }
 
-                await File.WriteAllLinesAsync(filePath, outputLines, Encoding.UTF8);
+                await File.WriteAllLinesAsync(validatedPath, outputLines, Encoding.UTF8, cancellationToken);
             }
             catch (Exception ex)
             {
-                throw new Exception($"保存文件失败: {ex.Message}", ex);
+                throw new FileOperationException(
+                    $"保存文件失败: {ex.Message}",
+                    ex,
+                    filePath,
+                    "Save");
             }
         }
 

@@ -38,18 +38,20 @@
                     <!-- API 地址 -->
                     <StackPanel Spacing="4">
                         <TextBlock Text="API 地址"/>
-                        <TextBox x:Name="ApiUrlTextBox" 
+                        <TextBox x:Name="ApiUrlTextBox"
                                  PlaceholderText="https://api.openai.com/v1/chat/completions"
                                  Text="https://api.openai.com/v1/chat/completions"
-                                 HorizontalAlignment="Stretch"/>
+                                 HorizontalAlignment="Stretch"
+                                 TextChanged="ApiUrlTextBox_TextChanged"/>
                     </StackPanel>
 
                     <!-- API 密钥 -->
                     <StackPanel Spacing="4">
                         <TextBlock Text="API 密钥"/>
-                        <PasswordBox x:Name="ApiKeyPasswordBox" 
+                        <PasswordBox x:Name="ApiKeyPasswordBox"
                                      PlaceholderText="输入您的 API 密钥"
-                                     HorizontalAlignment="Stretch"/>
+                                     HorizontalAlignment="Stretch"
+                                     PasswordChanged="ApiKeyPasswordBox_PasswordChanged"/>
                     </StackPanel>
 
                     <!-- 模型名称 -->
@@ -69,9 +71,10 @@
                                 </Button.Resources>
                             </Button>
                         </Grid>
-                        <ComboBox x:Name="ModelNameComboBox" 
+                        <ComboBox x:Name="ModelNameComboBox"
                                   IsEditable="True"
-                                  HorizontalAlignment="Stretch">
+                                  HorizontalAlignment="Stretch"
+                                  TextSubmitted="ModelNameComboBox_TextSubmitted">
                             <ComboBoxItem Content="gpt-3.5-turbo"/>
                             <ComboBoxItem Content="gpt-4"/>
                             <ComboBoxItem Content="gpt-4-turbo"/>
@@ -97,11 +100,12 @@
                     <!-- 最大令牌数 -->
                     <StackPanel Spacing="4">
                         <TextBlock Text="最大令牌数"/>
-                        <NumberBox x:Name="MaxTokensNumberBox" 
-                                   Value="2000" 
-                                   Minimum="1" 
+                        <NumberBox x:Name="MaxTokensNumberBox"
+                                   Value="2000"
+                                   Minimum="1"
                                    Maximum="32000"
-                                   SpinButtonPlacementMode="Inline"/>
+                                   SpinButtonPlacementMode="Inline"
+                                   ValueChanged="MaxTokensNumberBox_ValueChanged"/>
                     </StackPanel>
 
                     <!-- 温度 -->
@@ -171,21 +175,23 @@
                     <!-- 超时时间 -->
                     <StackPanel Spacing="4">
                         <TextBlock Text="超时时间（秒）"/>
-                        <NumberBox x:Name="TimeoutNumberBox" 
-                                   Value="30" 
-                                   Minimum="5" 
+                        <NumberBox x:Name="TimeoutNumberBox"
+                                   Value="30"
+                                   Minimum="5"
                                    Maximum="300"
-                                   SpinButtonPlacementMode="Inline"/>
+                                   SpinButtonPlacementMode="Inline"
+                                   ValueChanged="TimeoutNumberBox_ValueChanged"/>
                     </StackPanel>
 
                     <!-- 重试次数 -->
                     <StackPanel Spacing="4">
                         <TextBlock Text="重试次数"/>
-                        <NumberBox x:Name="RetryCountNumberBox" 
-                                   Value="3" 
-                                   Minimum="1" 
+                        <NumberBox x:Name="RetryCountNumberBox"
+                                   Value="3"
+                                   Minimum="1"
                                    Maximum="10"
-                                   SpinButtonPlacementMode="Inline"/>
+                                   SpinButtonPlacementMode="Inline"
+                                   ValueChanged="RetryCountNumberBox_ValueChanged"/>
                     </StackPanel>
                 </StackPanel>
             </Expander>
@@ -195,13 +201,14 @@
                 <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
                     <!-- 最大并发翻译数 -->
                     <StackPanel Spacing="4">
-                        <TextBlock Text="最大并发翻译数" 
+                        <TextBlock Text="最大并发翻译数"
                                    ToolTipService.ToolTip="同时发送给API翻译的文本数量，建议根据API速率限制调整"/>
-                        <NumberBox x:Name="MaxConcurrentTranslationsNumberBox" 
-                                   Value="3" 
-                                   Minimum="1" 
+                        <NumberBox x:Name="MaxConcurrentTranslationsNumberBox"
+                                   Value="3"
+                                   Minimum="1"
                                    Maximum="20"
-                                   SpinButtonPlacementMode="Inline"/>
+                                   SpinButtonPlacementMode="Inline"
+                                   ValueChanged="MaxConcurrentTranslationsNumberBox_ValueChanged"/>
                     </StackPanel>
                 </StackPanel>
             </Expander>
@@ -218,13 +225,14 @@
                     <!-- 提示词模板 -->
                     <StackPanel Spacing="4">
                         <TextBlock Text="提示词模板"/>
-                        <TextBox x:Name="SystemPromptTextBox" 
-                                 AcceptsReturn="True" 
-                                 TextWrapping="Wrap" 
+                        <TextBox x:Name="SystemPromptTextBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
                                  Height="180"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  HorizontalAlignment="Stretch"
-                                 Text="你是一个专业的游戏文本翻译助手。请将以下文本翻译成{目标语言}。保持原文的语气和风格，确保翻译准确、流畅、自然。&#xA;&#xA;【重要】如果文本中包含形如【SPECIAL_数字】的占位符，请务必在译文中完整保留这些占位符，不要翻译或修改它们。&#xA;&#xA;原文：{原文}&#xA;&#xA;术语参考：{术语}&#xA;&#xA;上下文参考：{上下文}&#xA;&#xA;请只输出翻译结果，不要包含任何解释或额外内容。"/>
+                                 Text="你是一个专业的游戏文本翻译助手。请将以下文本翻译成{目标语言}。保持原文的语气和风格，确保翻译准确、流畅、自然。&#xA;&#xA;【重要】如果文本中包含形如【SPECIAL_数字】的占位符，请务必在译文中完整保留这些占位符，不要翻译或修改它们。&#xA;&#xA;原文：{原文}&#xA;&#xA;术语参考：{术语}&#xA;&#xA;上下文参考：{上下文}&#xA;&#xA;请只输出翻译结果，不要包含任何解释或额外内容。"
+                                 TextChanged="SystemPromptTextBox_TextChanged"/>
                     </StackPanel>
 
                     <!-- 重置按钮 -->
@@ -331,15 +339,11 @@
                 </StackPanel>
             </Expander>
 
-            <!-- 保存按钮 -->
-            <Button Style="{StaticResource AccentButtonStyle}"
-                    Click="SaveConfigButton_Click"
-                    HorizontalAlignment="Right">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE74E;" FontSize="16"/>
-                    <TextBlock Text="保存配置"/>
-                </StackPanel>
-            </Button>
+            <!-- 自动保存提示 -->
+            <InfoBar Severity="Informational"
+                     IsOpen="True"
+                     IsClosable="False"
+                     Message="所有设置更改将自动保存"/>
         </StackPanel>
     </ScrollViewer>
 </Page>

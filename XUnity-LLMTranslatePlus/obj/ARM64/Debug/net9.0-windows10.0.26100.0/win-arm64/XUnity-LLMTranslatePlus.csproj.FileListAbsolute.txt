@@ -579,3 +579,15 @@ D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\ARM64\Debug\
 D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\qualifiers.txt
 D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\qualifiers.txt.intermediate
 D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\obj\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\MultipleQualifiersPerDimensionFound.txt
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Configuration.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Configuration.Abstractions.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Configuration.Binder.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Diagnostics.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Diagnostics.Abstractions.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Http.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Logging.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Logging.Abstractions.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Options.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Options.ConfigurationExtensions.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\Microsoft.Extensions.Primitives.dll
+D:\Document\Git\XUnity.LLMTranslatePlus\XUnity-LLMTranslatePlus\bin\ARM64\Debug\net9.0-windows10.0.26100.0\win-arm64\System.Security.Cryptography.ProtectedData.dll

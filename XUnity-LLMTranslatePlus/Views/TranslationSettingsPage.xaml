@@ -37,11 +37,12 @@
                         </StackPanel>
 
                         <!-- 自动检测路径 -->
-                        <ToggleSwitch x:Name="AutoDetectPathToggle" 
+                        <ToggleSwitch x:Name="AutoDetectPathToggle"
                                       Header="自动检测 Translation 路径"
                                       IsOn="True"
-                                      OnContent="已启用" 
-                                      OffContent="已禁用"/>
+                                      OnContent="已启用"
+                                      OffContent="已禁用"
+                                      Toggled="AutoDetectPathToggle_Toggled"/>
 
                     <!-- 当前 Translation 文件路径 -->
                     <StackPanel Spacing="4">
@@ -60,9 +61,10 @@
                         <!-- 目标语言 -->
                         <StackPanel Spacing="4">
                             <TextBlock Text="目标语言"/>
-                            <ComboBox x:Name="TargetLanguageComboBox" 
+                            <ComboBox x:Name="TargetLanguageComboBox"
                                       SelectedIndex="0"
-                                      HorizontalAlignment="Stretch">
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="TargetLanguageComboBox_SelectionChanged">
                                 <ComboBoxItem Content="简体中文"/>
                                 <ComboBoxItem Content="繁体中文"/>
                                 <ComboBoxItem Content="英语"/>
@@ -77,9 +79,10 @@
                         <!-- 源语言 -->
                         <StackPanel Spacing="4">
                             <TextBlock Text="源语言"/>
-                            <ComboBox x:Name="SourceLanguageComboBox" 
+                            <ComboBox x:Name="SourceLanguageComboBox"
                                       SelectedIndex="0"
-                                      HorizontalAlignment="Stretch">
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="SourceLanguageComboBox_SelectionChanged">
                                 <ComboBoxItem Content="自动检测"/>
                                 <ComboBoxItem Content="日语"/>
                                 <ComboBoxItem Content="英语"/>
@@ -105,11 +108,12 @@
                     <!-- 文件监控间隔 -->
                     <StackPanel x:Name="MonitorIntervalPanel" Spacing="4">
                         <TextBlock Text="文件监控间隔（毫秒）"/>
-                        <NumberBox x:Name="MonitorIntervalNumberBox" 
-                                   Value="500" 
-                                   Minimum="100" 
+                        <NumberBox x:Name="MonitorIntervalNumberBox"
+                                   Value="500"
+                                   Minimum="100"
                                    Maximum="5000"
-                                   SpinButtonPlacementMode="Inline"/>
+                                   SpinButtonPlacementMode="Inline"
+                                   ValueChanged="MonitorIntervalNumberBox_ValueChanged"/>
                     </StackPanel>
                 </StackPanel>
             </Expander>
@@ -132,11 +136,12 @@
                             <!-- 上下文行数 -->
                             <StackPanel Spacing="4">
                                 <TextBlock Text="上下文行数（前后各 N 行）"/>
-                                <NumberBox x:Name="ContextLinesNumberBox" 
-                                           Value="3" 
-                                           Minimum="1" 
+                                <NumberBox x:Name="ContextLinesNumberBox"
+                                           Value="3"
+                                           Minimum="1"
                                            Maximum="10"
-                                           SpinButtonPlacementMode="Inline"/>
+                                           SpinButtonPlacementMode="Inline"
+                                           ValueChanged="ContextLinesNumberBox_ValueChanged"/>
                             </StackPanel>
 
                             <!-- 上下文权重 -->
@@ -166,11 +171,12 @@
             <!-- 输出配置 -->
             <Expander Header="输出配置" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                 <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
-                        <ToggleSwitch x:Name="EnableCacheToggle" 
+                        <ToggleSwitch x:Name="EnableCacheToggle"
                                       Header="启用翻译缓存（避免重复翻译相同文本）"
                                       IsOn="True"
-                                      OnContent="已启用" 
-                                      OffContent="已禁用"/>
+                                      OnContent="已启用"
+                                      OffContent="已禁用"
+                                      Toggled="EnableCacheToggle_Toggled"/>
                         
                     <CheckBox x:Name="ExportLogCheckBox" 
                               Content="导出翻译日志（记录所有翻译操作）" 
@@ -178,15 +184,11 @@
                 </StackPanel>
             </Expander>
 
-            <!-- 保存按钮 -->
-            <Button Style="{StaticResource AccentButtonStyle}"
-                    Click="SaveSettingsButton_Click"
-                    HorizontalAlignment="Right">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE74E;" FontSize="16"/>
-                    <TextBlock Text="保存设置"/>
-                </StackPanel>
-            </Button>
+            <!-- 自动保存提示 -->
+            <InfoBar Severity="Informational"
+                     IsOpen="True"
+                     IsClosable="False"
+                     Message="所有设置更改将自动保存"/>
         </StackPanel>
     </ScrollViewer>
 </Page>

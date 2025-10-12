@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using XUnity_LLMTranslatePlus.Models;
 using XUnity_LLMTranslatePlus.Services;
+using Microsoft.UI.Dispatching;
 
 namespace XUnity_LLMTranslatePlus.Views
 {
@@ -23,6 +24,8 @@ namespace XUnity_LLMTranslatePlus.Views
         private readonly ApiClient? _apiClient;
         private readonly LogService? _logService;
         private AppConfig? _currentConfig;
+        private DispatcherQueueTimer? _autoSaveTimer;
+        private bool _isLoadingConfig = false;
 
         // API平台配置映射
         private readonly Dictionary<string, (string format, string defaultUrl)> _platformConfigs = new()
@@ -50,6 +53,15 @@ namespace XUnity_LLMTranslatePlus.Views
             _apiClient = App.GetService<ApiClient>();
             _logService = App.GetService<LogService>();
 
+            // 初始化自动保存定时器（防抖：800ms 后保存，API配置相对复杂，延迟稍长）
+            _autoSaveTimer = DispatcherQueue.CreateTimer();
+            _autoSaveTimer.Interval = TimeSpan.FromMilliseconds(800);
+            _autoSaveTimer.Tick += (s, e) =>
+            {
+                _autoSaveTimer.Stop();
+                _ = AutoSaveConfigAsync();
+            };
+
             // 加载配置和术语
             LoadConfiguration();
 
@@ -72,6 +84,7 @@ namespace XUnity_LLMTranslatePlus.Views
 
         private async void LoadConfiguration()
         {
+            _isLoadingConfig = true;
             try
             {
                 if (_configService != null)
@@ -95,6 +108,10 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 _logService?.Log($"加载配置失败: {ex.Message}", LogLevel.Error);
                 // 加载配置失败时静默处理，不显示错误对话框
+            }
+            finally
+            {
+                _isLoadingConfig = false;
             }
         }
 
@@ -147,7 +164,7 @@ namespace XUnity_LLMTranslatePlus.Views
             if (ApiPlatformComboBox.SelectedItem is ComboBoxItem item)
             {
                 string platformName = item.Content.ToString() ?? "自定义";
-                
+
                 // 如果找到平台配置，自动设置URL
                 if (_platformConfigs.TryGetValue(platformName, out var config))
                 {
@@ -163,16 +180,18 @@ namespace XUnity_LLMTranslatePlus.Views
                     ApiUrlTextBox.IsReadOnly = platformName != "自定义";
                 }
             }
+            TriggerAutoSave();
         }
 
-        private AppConfig GetConfigFromUI()
+        private async System.Threading.Tasks.Task<AppConfig> GetConfigFromUIAsync()
         {
-            var config = _currentConfig ?? new AppConfig();
+            // 始终从 ConfigService 获取最新配置，确保不丢失其他页面的设置
+            var config = await _configService!.LoadConfigAsync();
 
             // 基础配置 - 获取平台名称
             string platformName = (ApiPlatformComboBox.SelectedItem as ComboBoxItem)?.Content.ToString() ?? "自定义";
             config.ApiPlatform = platformName;
-            
+
             // 设置API格式
             if (_platformConfigs.TryGetValue(platformName, out var platformConfig))
             {
@@ -182,7 +201,7 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 config.ApiFormat = "OpenAI"; // 默认使用OpenAI格式
             }
-            
+
             // 自动补全API地址
             config.ApiUrl = AutoCompleteApiUrl(ApiUrlTextBox.Text, platformName);
             config.ApiKey = ApiKeyPasswordBox.Password;
@@ -240,6 +259,7 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 TemperatureValueText.Text = e.NewValue.ToString("F1");
             }
+            TriggerAutoSave();
         }
 
         private void TopPSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
@@ -248,6 +268,7 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 TopPValueText.Text = e.NewValue.ToString("F1");
             }
+            TriggerAutoSave();
         }
 
         private void FrequencyPenaltySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
@@ -256,6 +277,7 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 FrequencyPenaltyValueText.Text = e.NewValue.ToString("F1");
             }
+            TriggerAutoSave();
         }
 
         private void PresencePenaltySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
@@ -264,6 +286,7 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 PresencePenaltyValueText.Text = e.NewValue.ToString("F1");
             }
+            TriggerAutoSave();
         }
 
         private async void TestConnectionButton_Click(object sender, RoutedEventArgs e)
@@ -283,7 +306,7 @@ namespace XUnity_LLMTranslatePlus.Views
 
             try
             {
-                var config = GetConfigFromUI();
+                var config = await GetConfigFromUIAsync();
 
                 // 显示进度对话框
                 ContentDialog progressDialog = new ContentDialog
@@ -344,7 +367,7 @@ namespace XUnity_LLMTranslatePlus.Views
             try
             {
                 // 获取当前配置
-                var config = GetConfigFromUI();
+                var config = await GetConfigFromUIAsync();
 
                 // 显示进度
                 RefreshModelsButton.IsEnabled = false;
@@ -358,7 +381,7 @@ namespace XUnity_LLMTranslatePlus.Views
                 {
                     string currentModel = ModelNameComboBox.Text;
                     ModelNameComboBox.Items.Clear();
-                    
+
                     foreach (var model in models)
                     {
                         ModelNameComboBox.Items.Add(new ComboBoxItem { Content = model });
@@ -536,26 +559,33 @@ namespace XUnity_LLMTranslatePlus.Views
             }
         }
 
-        private async void SaveConfigButton_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// 触发自动保存（带防抖）
+        /// </summary>
+        private void TriggerAutoSave()
         {
-            if (_configService == null || _terminologyService == null)
-            {
-                ContentDialog dialog = new ContentDialog
-                {
-                    Title = "错误",
-                    Content = "服务未初始化",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await dialog.ShowAsync();
-                return;
-            }
+            if (_isLoadingConfig || _configService == null) return;
+
+            // 重启定时器（防抖）
+            _autoSaveTimer?.Stop();
+            _autoSaveTimer?.Start();
+        }
+
+        /// <summary>
+        /// 自动保存配置
+        /// </summary>
+        private async System.Threading.Tasks.Task AutoSaveConfigAsync()
+        {
+            if (_configService == null || _terminologyService == null) return;
 
             try
             {
-                // 保存配置
-                var config = GetConfigFromUI();
+                // 从 UI 获取配置（内部会加载完整配置并只更新 API 相关字段）
+                var config = await GetConfigFromUIAsync();
                 await _configService.SaveConfigAsync(config);
+
+                // 更新本地缓存
+                _currentConfig = config;
 
                 // 保存术语库 - 先清空再添加
                 _terminologyService.ClearTerms();
@@ -565,30 +595,53 @@ namespace XUnity_LLMTranslatePlus.Views
                 }
                 await _terminologyService.SaveTermsAsync();
 
-                _logService?.Log("API 配置已保存", LogLevel.Info);
-
-                ContentDialog successDialog = new ContentDialog
-                {
-                    Title = "保存成功",
-                    Content = "API 配置和术语库已保存！",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await successDialog.ShowAsync();
+                _logService?.Log("API 配置已自动保存", LogLevel.Debug);
             }
             catch (Exception ex)
             {
-                _logService?.Log($"保存配置失败: {ex.Message}", LogLevel.Error);
-
-                ContentDialog errorDialog = new ContentDialog
-                {
-                    Title = "保存失败",
-                    Content = $"保存失败: {ex.Message}",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await errorDialog.ShowAsync();
+                _logService?.Log($"自动保存 API 配置失败: {ex.Message}", LogLevel.Error);
             }
+        }
+
+        // 控件事件处理函数
+        private void ApiUrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            TriggerAutoSave();
+        }
+
+        private void ApiKeyPasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            TriggerAutoSave();
+        }
+
+        private void ModelNameComboBox_TextSubmitted(ComboBox sender, ComboBoxTextSubmittedEventArgs args)
+        {
+            TriggerAutoSave();
+        }
+
+        private void MaxTokensNumberBox_ValueChanged(Microsoft.UI.Xaml.Controls.NumberBox sender, Microsoft.UI.Xaml.Controls.NumberBoxValueChangedEventArgs args)
+        {
+            TriggerAutoSave();
+        }
+
+        private void TimeoutNumberBox_ValueChanged(Microsoft.UI.Xaml.Controls.NumberBox sender, Microsoft.UI.Xaml.Controls.NumberBoxValueChangedEventArgs args)
+        {
+            TriggerAutoSave();
+        }
+
+        private void RetryCountNumberBox_ValueChanged(Microsoft.UI.Xaml.Controls.NumberBox sender, Microsoft.UI.Xaml.Controls.NumberBoxValueChangedEventArgs args)
+        {
+            TriggerAutoSave();
+        }
+
+        private void MaxConcurrentTranslationsNumberBox_ValueChanged(Microsoft.UI.Xaml.Controls.NumberBox sender, Microsoft.UI.Xaml.Controls.NumberBoxValueChangedEventArgs args)
+        {
+            TriggerAutoSave();
+        }
+
+        private void SystemPromptTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            TriggerAutoSave();
         }
     }
 }
