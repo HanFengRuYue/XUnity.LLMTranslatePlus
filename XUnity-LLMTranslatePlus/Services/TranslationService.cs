@@ -23,6 +23,20 @@ namespace XUnity_LLMTranslatePlus.Services
         public int TotalFailed { get; private set; }
         public int TotalSkipped { get; private set; }
 
+        // 正在翻译中的数量（已发送给API等待返回）
+        private int _translatingCount = 0;
+        private readonly object _translatingLock = new object();
+        public int TranslatingCount
+        {
+            get
+            {
+                lock (_translatingLock)
+                {
+                    return _translatingCount;
+                }
+            }
+        }
+
         // 上下文缓存
         private readonly List<string> _contextCache = new List<string>();
         private const int MaxContextLines = 10;
@@ -55,6 +69,13 @@ namespace XUnity_LLMTranslatePlus.Services
 
             // 检查取消请求
             cancellationToken.ThrowIfCancellationRequested();
+
+            // 增加正在翻译的计数
+            lock (_translatingLock)
+            {
+                _translatingCount++;
+            }
+            NotifyProgress();
 
             try
             {
@@ -114,7 +135,6 @@ namespace XUnity_LLMTranslatePlus.Services
                 AddToContext(originalText, translatedText);
 
                 TotalTranslated++;
-                NotifyProgress();
 
                 await _logService.LogAsync($"翻译完成: {translatedText}", LogLevel.Debug);
 
@@ -123,10 +143,18 @@ namespace XUnity_LLMTranslatePlus.Services
             catch (Exception ex)
             {
                 TotalFailed++;
-                NotifyProgress();
 
                 await _logService.LogAsync($"翻译失败: {originalText} - {ex.Message}", LogLevel.Error);
                 throw;
+            }
+            finally
+            {
+                // 无论成功还是失败，都要减少正在翻译的计数
+                lock (_translatingLock)
+                {
+                    _translatingCount--;
+                }
+                NotifyProgress();
             }
         }
 
@@ -244,6 +272,10 @@ namespace XUnity_LLMTranslatePlus.Services
             TotalTranslated = 0;
             TotalFailed = 0;
             TotalSkipped = 0;
+            lock (_translatingLock)
+            {
+                _translatingCount = 0;
+            }
             NotifyProgress();
         }
 
@@ -256,7 +288,8 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 TotalTranslated = TotalTranslated,
                 TotalFailed = TotalFailed,
-                TotalSkipped = TotalSkipped
+                TotalSkipped = TotalSkipped,
+                TranslatingCount = TranslatingCount
             });
         }
 
@@ -277,6 +310,7 @@ namespace XUnity_LLMTranslatePlus.Services
         public int TotalTranslated { get; set; }
         public int TotalFailed { get; set; }
         public int TotalSkipped { get; set; }
+        public int TranslatingCount { get; set; }
     }
 }
 

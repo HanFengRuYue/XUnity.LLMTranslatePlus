@@ -324,25 +324,6 @@ namespace XUnity_LLMTranslatePlus.Views
             }
         }
 
-        private async void TranslateThisButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_textEditorService == null || currentEntry == null) return;
-
-            try
-            {
-                var translationService = App.GetService<TranslationService>();
-                if (translationService != null)
-                {
-                    string translated = await translationService.TranslateTextAsync(currentEntry.Key);
-                    TranslatedTextBox.Text = translated;
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService?.Log($"翻译失败: {ex.Message}", LogLevel.Error);
-            }
-        }
-
         private void CopyOriginalButton_Click(object sender, RoutedEventArgs e)
         {
             if (currentEntry != null)

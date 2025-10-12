@@ -211,13 +211,13 @@
                         <!-- 原文（键） -->
                         <StackPanel Spacing="8">
                             <Grid>
-                                <TextBlock Text="原文（键）" 
+                                <TextBlock Text="原文（键）"
                                            Style="{StaticResource SubtitleTextBlockStyle}"/>
                                 <Button HorizontalAlignment="Right"
                                         Click="CopyOriginalButton_Click">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon Glyph="&#xE8C8;" FontSize="14"/>
-                                        <TextBlock Text="复制"/>
+                                        <FontIcon Glyph="&#xE894;" FontSize="14"/>
+                                        <TextBlock Text="清除译文"/>
                                     </StackPanel>
                                 </Button>
                             </Grid>
@@ -266,7 +266,7 @@
                                     <KeyboardAccelerator Key="S" Modifiers="Control"/>
                                 </Button.KeyboardAccelerators>
                             </Button>
-                            
+
                             <Button Click="UndoButton_Click">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon Glyph="&#xE7A7;" FontSize="14"/>
@@ -275,13 +275,6 @@
                                 <Button.KeyboardAccelerators>
                                     <KeyboardAccelerator Key="Z" Modifiers="Control"/>
                                 </Button.KeyboardAccelerators>
-                            </Button>
-                            
-                            <Button Click="TranslateThisButton_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon Glyph="&#xE774;" FontSize="14"/>
-                                    <TextBlock Text="AI 翻译"/>
-                                </StackPanel>
                             </Button>
                         </StackPanel>
                         </StackPanel>

@@ -68,15 +68,15 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 错误卡片 -->
-                <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" 
+                <!-- 翻译队列卡片 -->
+                <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="8">
-                        <TextBlock Text="错误" Style="{StaticResource BodyStrongTextBlockStyle}"/>
-                        <TextBlock x:Name="ErrorCountText" Text="0" 
-                                   Style="{StaticResource SubtitleTextBlockStyle}" 
-                                   Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                        <TextBlock Text="翻译队列" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                        <TextBlock x:Name="QueueCountText" Text="0"
+                                   Style="{StaticResource SubtitleTextBlockStyle}"
+                                   Foreground="{ThemeResource SystemFillColorAttentionBrush}"/>
                     </StackPanel>
                 </Border>
             </Grid>

@@ -144,22 +144,6 @@
                                            ValueChanged="ContextLinesNumberBox_ValueChanged"/>
                             </StackPanel>
 
-                            <!-- 上下文权重 -->
-                            <StackPanel Spacing="4">
-                                <Grid>
-                                    <TextBlock Text="上下文权重" HorizontalAlignment="Left"/>
-                                    <TextBlock x:Name="ContextWeightValueText" 
-                                               Text="0.5" 
-                                               HorizontalAlignment="Right"/>
-                                </Grid>
-                                <Slider x:Name="ContextWeightSlider" 
-                                        Minimum="0" 
-                                        Maximum="1" 
-                                        StepFrequency="0.1" 
-                                        Value="0.5"
-                                        ValueChanged="ContextWeightSlider_ValueChanged"/>
-                            </StackPanel>
-
                         <InfoBar Severity="Informational" 
                                  IsOpen="True" 
                                  IsClosable="False"

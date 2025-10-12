@@ -40,11 +40,22 @@ dotnet run --configuration Release
 # Self-contained publish for distribution
 dotnet publish --configuration Release --runtime win-x64 --self-contained true
 
-# Trimmed publish (smaller size, enabled in Release by default)
-dotnet publish --configuration Release --runtime win-x64 /p:PublishTrimmed=true
+# One-click Release build script (recommended)
+.\Build-Release.ps1
+
+# Build for different runtime
+.\Build-Release.ps1 -Runtime win-arm64
+
+# Skip clean step for faster builds
+.\Build-Release.ps1 -SkipClean
 ```
 
-**Note**: This project uses WinUI 3 in Unpackaged mode, so MSIX packaging is disabled. The executable runs directly without requiring installation.
+**Important Notes**:
+- This project uses WinUI 3 in Unpackaged mode, so MSIX packaging is disabled. The executable runs directly without requiring installation.
+- **PublishTrimmed is DISABLED** - IL trimming is not supported by WinUI 3/Windows App SDK (GitHub issue #2478). Setting it has no effect.
+- **ReadyToRun is DISABLED** for Release builds to reduce executable size by 20-40%. Trade-off: ~100-200ms slower startup.
+- **PDB generation is DISABLED** for Release builds (`DebugType=none`) to eliminate debug symbols (~5-20MB savings).
+- The `Build-Release.ps1` script automates the optimized release build process.
 
 ## Recent Optimizations (Important Context)
 
@@ -125,6 +136,29 @@ public async Task<string> TranslateAsync(..., CancellationToken cancellationToke
 ```
 
 Always propagate CancellationToken through async call chains.
+
+### 7. Release Build Optimizations
+**Location**: `XUnity-LLMTranslatePlus.csproj` (Publish Properties section)
+
+Release builds are optimized for size rather than startup performance:
+
+```xml
+<PropertyGroup>
+  <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">False</PublishReadyToRun>
+</PropertyGroup>
+
+<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+  <DebugType>none</DebugType>
+  <DebugSymbols>false</DebugSymbols>
+</PropertyGroup>
+```
+
+**Key Points:**
+- **ReadyToRun disabled**: R2R pre-compilation increases executable size by 20-40% for marginally faster startup. Disabled to prioritize size.
+- **PDB generation disabled**: Debug symbols add 5-20MB and are unnecessary for production builds.
+- **IL Trimming unavailable**: `PublishTrimmed` has no effect because WinUI 3/Windows App SDK doesn't support it yet.
+- **Single-file deployment**: Requires `EnableMsixTooling=true` even in unpackaged mode for embedded resources.pri generation.
+- **Expected size**: Core Windows App SDK runtime is ~150-200MB and cannot be reduced until Microsoft implements IL trimming support.
 
 ## Architecture Patterns
 
@@ -230,33 +264,50 @@ var logService = App.Current.Services.GetService<LogService>();
 
 Understanding the translation flow is crucial for modifications:
 
-1. **Extract Special Characters** - `EscapeCharacterHandler.ExtractSpecialChars()`
+1. **Increment TranslatingCount** - Thread-safe counter increment
+   - Tracks active translations (sent to API, awaiting response)
+   - Used by UI to display translation queue status
+
+2. **Extract Special Characters** - `EscapeCharacterHandler.ExtractSpecialChars()`
    - Replaces `\n`, `{0}`, `<color>`, etc. with placeholders like `【SPECIAL_0】`
    - Prevents AI from modifying special syntax
 
-2. **Build Context** - `BuildTermsReference()`, `BuildContextReference()`
+3. **Build Context** - `BuildTermsReference()`, `BuildContextReference()`
    - Includes relevant terms from terminology database
    - Adds previous 3 translations for context
 
-3. **Build System Prompt** - Replaces variables in template
+4. **Build System Prompt** - Replaces variables in template
    - `{目标语言}` → Target language
    - `{原文}` → Original text
    - `{术语}` → Terms reference
    - `{上下文}` → Context reference
 
-4. **Call API** - `ApiClient.TranslateAsync()`
+5. **Call API** - `ApiClient.TranslateAsync()`
    - Retries with exponential backoff
    - Supports cancellation token
    - Handles multiple exception types
 
-5. **Apply Terms** - `TerminologyService.ApplyTerms()`
+6. **Apply Terms** - `TerminologyService.ApplyTerms()`
    - Post-processing replacement of terminology
 
-6. **Restore Special Characters** - `EscapeCharacterHandler.SmartRestoreSpecialChars()`
+7. **Restore Special Characters** - `EscapeCharacterHandler.SmartRestoreSpecialChars()`
    - Intelligently restores placeholders to original special characters
    - Handles reordering by AI
 
-7. **Update Context Cache** - Stores for next translation
+8. **Update Context Cache** - Stores for next translation
+
+9. **Decrement TranslatingCount** - Always executed in `finally` block
+   - Ensures count is accurate even on errors
+   - Triggers progress update event
+
+### Translation Statistics
+The `TranslationService` tracks four key metrics:
+- `TotalTranslated` - Successfully completed translations
+- `TotalFailed` - Failed translation attempts
+- `TotalSkipped` - Skipped translations (e.g., already translated)
+- `TranslatingCount` - Currently processing (sent to API, awaiting response)
+
+**Important**: `TranslatingCount` uses thread-safe locking (`_translatingLock`) because multiple threads may be translating concurrently. The count is incremented before API call and decremented in `finally` block to ensure accuracy.
 
 ## File Monitoring System
 
@@ -288,6 +339,26 @@ var semaphore = new SemaphoreSlim(config.MaxConcurrentTranslations, config.MaxCo
 Batch size = `config.MaxConcurrentTranslations * 2` for optimal throughput.
 
 ## UI Patterns
+
+### Custom Title Bar
+**Location**: `MainWindow.xaml`, `MainWindow.xaml.cs`
+
+The application uses a custom title bar to match the Mica backdrop aesthetic:
+
+```csharp
+// In MainWindow constructor
+ExtendsContentIntoTitleBar = true;
+SetTitleBar(AppTitleBar);
+```
+
+```xaml
+<!-- Custom title bar grid -->
+<Grid x:Name="AppTitleBar" Grid.Row="0" Height="48">
+    <!-- App icon and title content -->
+</Grid>
+```
+
+**Important**: The title bar must be set BEFORE any navigation occurs. Title bar element must be non-interactive.
 
 ### Event-Driven Updates
 Services communicate with UI through events:
@@ -349,6 +420,14 @@ Pages are instantiated on navigation. No page caching.
 
 6. **XAML Build Errors**: If XAML fails to compile, check for CS errors first - they cascade to XAML compiler.
 
+7. **TranslatingCount Threading**: When reading `TranslatingCount`, the property handles locking internally. When incrementing/decrementing, always use the `_translatingLock` object to ensure thread safety.
+
+8. **Custom Title Bar**: The title bar element (`AppTitleBar`) must be non-interactive. Interactive elements in the title bar area will not receive input events.
+
+9. **Build Size Limitations**: Release builds will be ~150-200MB+ due to self-contained Windows App SDK runtime. This cannot be reduced further until Microsoft implements IL trimming support for WinUI 3. PublishTrimmed setting has no effect.
+
+10. **Single-File Deployment**: WinUI 3 single-file publish requires `EnableMsixTooling=true` even in unpackaged mode, otherwise build fails with error about resources.pri generation.
+
 ## Testing Translation API
 
 Use the built-in connection test:
@@ -365,10 +444,28 @@ This sends "Hello" with prompt "Translate to Chinese:" to verify connectivity.
 - **Concurrent Limits**: Default `MaxConcurrentTranslations` is 3. Higher values may cause rate limiting.
 - **Log Verbosity**: Use `LogLevel.Debug` sparingly - it generates significant I/O
 - **Memory**: TextFileParser keeps file contents in memory. Large translation files (>100K entries) may need optimization.
+- **UI Performance**:
+  - LogPage displays only the most recent 500 log entries to prevent UI lag
+  - Log export retrieves full log history from LogService
+  - HomePage limits recent translations to 8 entries
+  - Use UI virtualization (ItemsStackPanel) for large lists
 
 ## Version History Context
 
 - **v1.0.1**: Added CSV/TXT import/export to TextEditorPage
 - **v1.0.2**: Removed backup files, optimized ApiConfigPage UI, fixed LogPage filter state persistence
 - **v1.0.3**: Fixed corrupted translation detection, improved cache management in FileMonitorService
-- **Current**: Added comprehensive optimizations (IHttpClientFactory, Channel<T>, Regex source generators, Span<char>, CancellationToken, custom exceptions, path security, DPAPI encryption)
+- **Recent Optimizations**:
+  - Added comprehensive optimizations (IHttpClientFactory, Channel<T>, Regex source generators, Span<char>, CancellationToken, custom exceptions, path security, DPAPI encryption)
+  - Implemented custom title bar with Mica backdrop integration
+  - Added real-time translation queue tracking (`TranslatingCount`)
+  - UI improvements: Updated status displays across HomePage and LogPage
+  - Removed unused features: AI translation button in TextEditor, context weight slider (field reserved for future use)
+  - Enhanced log export to export all logs (not just displayed subset)
+- **Build Optimizations** (Latest):
+  - Created `Build-Release.ps1` one-click build script for automated releases
+  - Disabled ReadyToRun compilation for Release builds (20-40% size reduction, ~100-200ms slower startup)
+  - Disabled PDB generation for Release builds (5-20MB savings)
+  - Removed ineffective PublishTrimmed setting (WinUI 3 doesn't support IL trimming)
+  - Added `EnableMsixTooling=true` for single-file deployment support
+  - Total size reduction: ~35-80MB per build

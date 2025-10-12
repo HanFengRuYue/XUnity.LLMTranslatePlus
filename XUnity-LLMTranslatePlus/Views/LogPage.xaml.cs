@@ -261,12 +261,12 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 SuccessCountText.Text = _translationService.TotalTranslated.ToString();
                 FailureCountText.Text = _translationService.TotalFailed.ToString();
+                // 翻译队列显示正在翻译中的数量（已发送给API等待返回）
+                QueueCountText.Text = _translationService.TranslatingCount.ToString();
             }
 
             if (_fileMonitorService != null)
             {
-                QueueCountText.Text = _fileMonitorService.GetPendingCount().ToString();
-                
                 // 更新监控状态指示器
                 if (_fileMonitorService.IsMonitoring)
                 {
@@ -297,12 +297,17 @@ namespace XUnity_LLMTranslatePlus.Views
                 var file = await picker.PickSaveFileAsync();
                 if (file != null)
                 {
+                    // 导出全部日志，而不仅仅是当前显示的日志
                     await _logService.ExportLogsAsync(file.Path);
+
+                    // 获取实际导出的日志数量
+                    var allLogs = _logService.GetRecentLogs();
+                    int totalCount = allLogs.Count;
 
                     ContentDialog dialog = new ContentDialog
                     {
                         Title = "导出成功",
-                        Content = $"日志已导出到: {file.Path}",
+                        Content = $"已成功导出 {totalCount} 条日志到:\n{file.Path}",
                         CloseButtonText = "确定",
                         XamlRoot = this.XamlRoot
                     };

@@ -6,15 +6,37 @@
     xmlns:local="using:XUnity_LLMTranslatePlus"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d"
-    Title="XUnity-LLMTranslatePlus">
+    mc:Ignorable="d">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
     <Grid>
-        <NavigationView x:ConnectionId='2'
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 自定义标题栏 -->
+        <Grid x:ConnectionId='2' x:Name="AppTitleBar" Grid.Row="0" Height="48">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 应用图标和标题 -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
+                <Image Source="/Assets/AppIcon.png" Width="16" Height="16" Margin="0,0,8,0" />
+                <TextBlock Text="XUnity大语言模型翻译Plus"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- 导航视图 -->
+        <NavigationView x:ConnectionId='3'
+            Grid.Row="1"
             x:Name="NavView"
             IsBackButtonVisible="Collapsed"
             IsSettingsVisible="False"
@@ -27,8 +49,8 @@
                         <FontIcon Glyph="&#xE80F;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                
-                <NavigationViewItem Content="API 配置" Tag="ApiConfig">
+
+                <NavigationViewItem Content="API 设置" Tag="ApiConfig">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE713;"/>
                     </NavigationViewItem.Icon>
@@ -52,8 +74,8 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
-            
-            <Frame x:ConnectionId='3' x:Name="ContentFrame" Padding="24"/>
+
+            <Frame x:ConnectionId='4' x:Name="ContentFrame" Padding="24"/>
         </NavigationView>
     </Grid>
 </Window>

@@ -200,8 +200,8 @@ namespace XUnity_LLMTranslatePlus.Views
                 // 添加到最近翻译列表
                 RecentTranslations.Insert(0, e);
 
-                // 保持列表大小
-                while (RecentTranslations.Count > 10)
+                // 保持列表大小（限制为8条）
+                while (RecentTranslations.Count > 8)
                 {
                     RecentTranslations.RemoveAt(RecentTranslations.Count - 1);
                 }
@@ -223,11 +223,13 @@ namespace XUnity_LLMTranslatePlus.Views
             if (_translationService != null)
             {
                 TranslatedCountText.Text = _translationService.TotalTranslated.ToString();
-                ErrorCountText.Text = _translationService.TotalFailed.ToString();
+                // 翻译队列显示正在翻译中的数量（已发送给API等待返回）
+                QueueCountText.Text = _translationService.TranslatingCount.ToString();
             }
 
             if (_fileMonitorService != null)
             {
+                // 待翻译显示待处理的数量
                 PendingCountText.Text = _fileMonitorService.GetPendingCount().ToString();
             }
         }

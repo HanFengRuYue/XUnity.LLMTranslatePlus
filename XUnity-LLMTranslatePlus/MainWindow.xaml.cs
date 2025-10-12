@@ -13,11 +13,14 @@ namespace XUnity_LLMTranslatePlus
         public MainWindow()
         {
             InitializeComponent();
-            Title = "XUnity大语言模型翻译Plus";
-            
+
+            // 配置自定义标题栏
+            ExtendsContentIntoTitleBar = true;
+            SetTitleBar(AppTitleBar);
+
             // 设置窗口大小
             this.AppWindow.Resize(new Windows.Graphics.SizeInt32(1280, 800));
-            
+
             // 默认导航到主页
             NavView.SelectedItem = NavView.MenuItems[0];
             ContentFrame.Navigate(typeof(HomePage));

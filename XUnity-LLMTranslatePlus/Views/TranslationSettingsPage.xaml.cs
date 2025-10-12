@@ -70,7 +70,6 @@ namespace XUnity_LLMTranslatePlus.Views
             MonitorIntervalNumberBox.Value = config.MonitorInterval;
             EnableContextToggle.IsOn = config.EnableContext;
             ContextLinesNumberBox.Value = config.ContextLines;
-            ContextWeightSlider.Value = config.ContextWeight;
             EnableCacheToggle.IsOn = config.EnableCache;
 
             // 自动检测翻译文件路径
@@ -94,7 +93,6 @@ namespace XUnity_LLMTranslatePlus.Views
             config.MonitorInterval = (int)MonitorIntervalNumberBox.Value;
             config.EnableContext = EnableContextToggle.IsOn;
             config.ContextLines = (int)ContextLinesNumberBox.Value;
-            config.ContextWeight = ContextWeightSlider.Value;
             config.EnableCache = EnableCacheToggle.IsOn;
 
             return config;
@@ -154,15 +152,6 @@ namespace XUnity_LLMTranslatePlus.Views
             if (ContextConfigPanel != null)
             {
                 ContextConfigPanel.Visibility = EnableContextToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
-            }
-            TriggerAutoSave();
-        }
-
-        private void ContextWeightSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (ContextWeightValueText != null)
-            {
-                ContextWeightValueText.Text = e.NewValue.ToString("F1");
             }
             TriggerAutoSave();
         }

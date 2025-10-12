@@ -25,19 +25,19 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 
-                                <TextBox x:ConnectionId='17' x:Name="GameDirectoryTextBox" 
+                                <TextBox x:ConnectionId='15' x:Name="GameDirectoryTextBox" 
                                          Grid.Column="0"
                                          IsReadOnly="True"
                                          PlaceholderText="点击浏览按钮选择游戏目录"/>
                                 
-                                <Button x:ConnectionId='18' Grid.Column="1" 
+                                <Button x:ConnectionId='16' Grid.Column="1" 
                                         Content="浏览..." 
                                                                          />
                             </Grid>
                         </StackPanel>
 
                         <!-- 自动检测路径 -->
-                        <ToggleSwitch x:ConnectionId='15' x:Name="AutoDetectPathToggle"
+                        <ToggleSwitch x:ConnectionId='13' x:Name="AutoDetectPathToggle"
                                       Header="自动检测 Translation 路径"
                                       IsOn="True"
                                       OnContent="已启用"
@@ -47,7 +47,7 @@
                     <!-- 当前 Translation 文件路径 -->
                     <StackPanel Spacing="4">
                         <TextBlock Text="当前 Translation 文件路径"/>
-                        <TextBlock x:ConnectionId='16' x:Name="CurrentTranslationPathText" 
+                        <TextBlock x:ConnectionId='14' x:Name="CurrentTranslationPathText" 
                                    Text="未检测到" 
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                    TextWrapping="Wrap"/>
@@ -61,7 +61,7 @@
                         <!-- 目标语言 -->
                         <StackPanel Spacing="4">
                             <TextBlock Text="目标语言"/>
-                            <ComboBox x:ConnectionId='14' x:Name="TargetLanguageComboBox"
+                            <ComboBox x:ConnectionId='12' x:Name="TargetLanguageComboBox"
                                       SelectedIndex="0"
                                       HorizontalAlignment="Stretch"
                                                                                                 >
@@ -79,7 +79,7 @@
                         <!-- 源语言 -->
                         <StackPanel Spacing="4">
                             <TextBlock Text="源语言"/>
-                            <ComboBox x:ConnectionId='13' x:Name="SourceLanguageComboBox"
+                            <ComboBox x:ConnectionId='11' x:Name="SourceLanguageComboBox"
                                       SelectedIndex="0"
                                       HorizontalAlignment="Stretch"
                                                                                                 >
@@ -93,12 +93,12 @@
                         </StackPanel>
 
                         <!-- 保留特殊符号 -->
-                        <CheckBox x:ConnectionId='9' x:Name="PreserveSpecialCharsCheckBox" 
+                        <CheckBox x:ConnectionId='7' x:Name="PreserveSpecialCharsCheckBox" 
                                   Content="保留游戏文本中的转义符和特殊符号" 
                                   IsChecked="True"/>
 
                         <!-- 实时监控 -->
-                        <ToggleSwitch x:ConnectionId='10' x:Name="RealTimeMonitoringToggle" 
+                        <ToggleSwitch x:ConnectionId='8' x:Name="RealTimeMonitoringToggle" 
                                       Header="实时监控翻译文件"
                                       IsOn="True"
                                       OnContent="已启用" 
@@ -106,9 +106,9 @@
                                                                                 />
 
                     <!-- 文件监控间隔 -->
-                    <StackPanel x:ConnectionId='11' x:Name="MonitorIntervalPanel" Spacing="4">
+                    <StackPanel x:ConnectionId='9' x:Name="MonitorIntervalPanel" Spacing="4">
                         <TextBlock Text="文件监控间隔（毫秒）"/>
-                        <NumberBox x:ConnectionId='12' x:Name="MonitorIntervalNumberBox"
+                        <NumberBox x:ConnectionId='10' x:Name="MonitorIntervalNumberBox"
                                    Value="500"
                                    Minimum="100"
                                    Maximum="5000"
@@ -136,28 +136,12 @@
                             <!-- 上下文行数 -->
                             <StackPanel Spacing="4">
                                 <TextBlock Text="上下文行数（前后各 N 行）"/>
-                                <NumberBox x:ConnectionId='8' x:Name="ContextLinesNumberBox"
+                                <NumberBox x:ConnectionId='6' x:Name="ContextLinesNumberBox"
                                            Value="3"
                                            Minimum="1"
                                            Maximum="10"
                                            SpinButtonPlacementMode="Inline"
                                                                                             />
-                            </StackPanel>
-
-                            <!-- 上下文权重 -->
-                            <StackPanel Spacing="4">
-                                <Grid>
-                                    <TextBlock Text="上下文权重" HorizontalAlignment="Left"/>
-                                    <TextBlock x:ConnectionId='7' x:Name="ContextWeightValueText" 
-                                               Text="0.5" 
-                                               HorizontalAlignment="Right"/>
-                                </Grid>
-                                <Slider x:ConnectionId='6' x:Name="ContextWeightSlider" 
-                                        Minimum="0" 
-                                        Maximum="1" 
-                                        StepFrequency="0.1" 
-                                        Value="0.5"
-                                                                                       />
                             </StackPanel>
 
                         <InfoBar Severity="Informational" 

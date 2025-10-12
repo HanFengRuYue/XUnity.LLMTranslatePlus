@@ -1,12 +1,54 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{810811E3-5C78-4B99-B7A2-C778ABA70320}|XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj|d:\\document\\git\\xunity.llmtranslateplus\\xunity-llmtranslateplus\\xunity-llmtranslateplus.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{810811E3-5C78-4B99-B7A2-C778ABA70320}|XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj|solutionrelative:xunity-llmtranslateplus\\xunity-llmtranslateplus.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{810811E3-5C78-4B99-B7A2-C778ABA70320}|XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj|d:\\document\\git\\xunity.llmtranslateplus\\xunity-llmtranslateplus\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
+      "RelativeMoniker": "D:0:0:{810811E3-5C78-4B99-B7A2-C778ABA70320}|XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj|solutionrelative:xunity-llmtranslateplus\\app.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": []
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "XUnity-LLMTranslatePlus",
+              "DocumentMoniker": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+              "RelativeDocumentMoniker": "XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+              "ToolTip": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+              "RelativeToolTip": "XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-10-12T14:18:35.437Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "App.xaml",
+              "DocumentMoniker": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\App.xaml",
+              "RelativeDocumentMoniker": "XUnity-LLMTranslatePlus\\App.xaml",
+              "ToolTip": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\App.xaml",
+              "RelativeToolTip": "XUnity-LLMTranslatePlus\\App.xaml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-10-12T14:18:30.591Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
     }
   ]
 }
