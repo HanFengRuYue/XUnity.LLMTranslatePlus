@@ -23,7 +23,7 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "XUnity-LLMTranslatePlus",
+              "Title": "XUnity-LLMTranslatePlus.csproj",
               "DocumentMoniker": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
               "RelativeDocumentMoniker": "XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
               "ToolTip": "D:\\Document\\Git\\XUnity.LLMTranslatePlus\\XUnity-LLMTranslatePlus\\XUnity-LLMTranslatePlus.csproj",
@@ -43,8 +43,7 @@
               "RelativeToolTip": "XUnity-LLMTranslatePlus\\App.xaml",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2025-10-12T14:18:30.591Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-10-12T14:18:30.591Z"
             }
           ]
         }
