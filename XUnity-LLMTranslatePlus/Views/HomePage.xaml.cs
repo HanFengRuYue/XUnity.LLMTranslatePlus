@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Channels;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -24,10 +26,21 @@ namespace XUnity_LLMTranslatePlus.Views
         private readonly LogService? _logService;
         private DispatcherQueueTimer? _refreshTimer;
 
+        // UI更新Channel（批量缓冲翻译条目以减少UI更新频率）
+        private readonly Channel<TranslationEntry> _uiTranslationChannel;
+        private DispatcherQueueTimer? _batchUpdateTimer;
+
         public HomePage()
         {
             this.InitializeComponent();
             RecentTranslations = _recentTranslationsCache;
+
+            // 初始化UI更新Channel（无界通道）
+            _uiTranslationChannel = Channel.CreateUnbounded<TranslationEntry>(new UnboundedChannelOptions
+            {
+                SingleReader = true,  // 只有UI线程读取
+                SingleWriter = false  // 多个线程可能写入
+            });
 
             // 获取服务
             _fileMonitorService = App.GetService<FileMonitorService>();
@@ -51,11 +64,14 @@ namespace XUnity_LLMTranslatePlus.Views
             // 初始化界面
             InitializeUI();
 
-            // 启动自动刷新定时器（每秒更新一次统计数据）
+            // 启动自动刷新定时器（每2秒更新一次统计数据 - 优化4）
             _refreshTimer = DispatcherQueue.CreateTimer();
-            _refreshTimer.Interval = TimeSpan.FromSeconds(1);
+            _refreshTimer.Interval = TimeSpan.FromSeconds(2);
             _refreshTimer.Tick += (s, e) => UpdateStatistics();
             _refreshTimer.Start();
+
+            // 启动批量更新定时器（每500ms批量处理翻译条目）
+            StartBatchUpdateTimer();
 
             // 订阅页面卸载事件
             this.Unloaded += HomePage_Unloaded;
@@ -69,6 +85,14 @@ namespace XUnity_LLMTranslatePlus.Views
                 _refreshTimer.Stop();
                 _refreshTimer = null;
             }
+
+            if (_batchUpdateTimer != null)
+            {
+                _batchUpdateTimer.Stop();
+                _batchUpdateTimer = null;
+            }
+
+            _uiTranslationChannel.Writer.TryComplete();
         }
 
         private void Page_Loaded(object sender, RoutedEventArgs e)
@@ -206,29 +230,9 @@ namespace XUnity_LLMTranslatePlus.Views
 
         private void OnEntryTranslated(object? sender, TranslationEntry e)
         {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                // 检查是否已经存在相同的翻译（防止重复显示）
-                var existingEntry = RecentTranslations.FirstOrDefault(t => 
-                    t.Key == e.Key && t.Value == e.Value);
-                
-                if (existingEntry != null)
-                {
-                    // 如果已存在，移除旧的，添加到顶部（更新时间）
-                    RecentTranslations.Remove(existingEntry);
-                }
-
-                // 添加到最近翻译列表
-                RecentTranslations.Insert(0, e);
-
-                // 保持列表大小（限制为8条）
-                while (RecentTranslations.Count > 8)
-                {
-                    RecentTranslations.RemoveAt(RecentTranslations.Count - 1);
-                }
-
-                UpdateStatistics();
-            });
+            // 不再直接更新UI，而是写入Channel缓冲
+            // 定时器会批量处理这些翻译条目，减少UI更新频率
+            _uiTranslationChannel.Writer.TryWrite(e);
         }
 
         private void OnTranslationProgressUpdated(object? sender, TranslationProgressEventArgs e)
@@ -305,6 +309,70 @@ namespace XUnity_LLMTranslatePlus.Views
                 };
                 await dialog.ShowAsync();
             });
+        }
+
+        /// <summary>
+        /// 启动批量更新定时器
+        /// </summary>
+        private void StartBatchUpdateTimer()
+        {
+            _batchUpdateTimer = DispatcherQueue.CreateTimer();
+            _batchUpdateTimer.Interval = TimeSpan.FromMilliseconds(500); // 每500ms批量处理一次
+            _batchUpdateTimer.Tick += BatchUpdateTimer_Tick;
+            _batchUpdateTimer.Start();
+        }
+
+        /// <summary>
+        /// 批量更新定时器触发
+        /// </summary>
+        private void BatchUpdateTimer_Tick(object? sender, object e)
+        {
+            BatchProcessTranslations();
+        }
+
+        /// <summary>
+        /// 批量处理Channel中的翻译条目
+        /// </summary>
+        private void BatchProcessTranslations()
+        {
+            var batch = new List<TranslationEntry>();
+
+            // 从Channel中读取最多20条翻译（避免单次处理过多）
+            while (batch.Count < 20 && _uiTranslationChannel.Reader.TryRead(out var entry))
+            {
+                batch.Add(entry);
+            }
+
+            if (batch.Count == 0)
+            {
+                return;
+            }
+
+            // 批量处理翻译条目
+            foreach (var e in batch)
+            {
+                // 检查是否已经存在相同的翻译（防止重复显示）
+                var existingEntry = RecentTranslations.FirstOrDefault(t =>
+                    t.Key == e.Key && t.Value == e.Value);
+
+                if (existingEntry != null)
+                {
+                    // 如果已存在，移除旧的，添加到顶部（更新时间）
+                    RecentTranslations.Remove(existingEntry);
+                }
+
+                // 添加到最近翻译列表
+                RecentTranslations.Insert(0, e);
+            }
+
+            // 保持列表大小（限制为8条）
+            while (RecentTranslations.Count > 8)
+            {
+                RecentTranslations.RemoveAt(RecentTranslations.Count - 1);
+            }
+
+            // 批量处理后统一更新一次统计
+            UpdateStatistics();
         }
     }
 }

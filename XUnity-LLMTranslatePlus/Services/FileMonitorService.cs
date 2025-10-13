@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using XUnity_LLMTranslatePlus.Models;
 using XUnity_LLMTranslatePlus.Utils;
@@ -22,17 +23,19 @@ namespace XUnity_LLMTranslatePlus.Services
         private TextFileParser? _parser;
         private string? _monitoredFilePath;
         private bool _isMonitoring;
-        private Timer? _processTimer;
         private readonly object _lockObject = new object();
 
-        // 待处理的文本队列
-        private readonly Queue<string> _pendingTexts = new Queue<string>();
-        
+        // 待处理的文本Channel（替代Queue以支持高性能持续并发）
+        private Channel<string>? _pendingTexts;
+
         // 已处理的文本集合（防止重复翻译）
         private readonly HashSet<string> _processedTexts = new HashSet<string>();
-        
+
         // 取消标记源（用于优雅停止）
         private CancellationTokenSource? _cancellationTokenSource;
+
+        // 消费者任务列表（持续并发翻译）
+        private List<Task>? _consumerTasks;
 
         public event EventHandler<FileMonitorEventArgs>? StatusChanged;
         public event EventHandler<TranslationEntry>? EntryTranslated;
@@ -116,20 +119,27 @@ namespace XUnity_LLMTranslatePlus.Services
 
                 // 初始化取消标记
                 _cancellationTokenSource = new CancellationTokenSource();
-                
+
+                // 初始化Channel（无界通道，支持高吞吐量）
+                _pendingTexts = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
+                {
+                    SingleReader = false,  // 多个消费者
+                    SingleWriter = false   // 可能有多个生产者（文件监控、初始加载）
+                });
+
                 // 清空已处理文本集合
                 lock (_processedTexts)
                 {
                     _processedTexts.Clear();
                 }
 
-                // 启动定时处理器（每 5 秒处理一次待翻译队列）
-                _processTimer = new Timer(ProcessPendingTextsCallback, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
-
                 lock (_lockObject)
                 {
                     _isMonitoring = true;
                 }
+
+                // 启动消费者任务池（持续并发翻译）
+                StartConsumerTasks(_configService.GetCurrentConfig());
 
                 await _logService.LogAsync("文件监控已启动", LogLevel.Info);
                 NotifyStatusChanged("运行中", true);
@@ -159,13 +169,27 @@ namespace XUnity_LLMTranslatePlus.Services
             // 取消所有正在进行的操作
             _cancellationTokenSource?.Cancel();
 
-            // 停止定时器
-            _processTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            _processTimer?.Dispose();
-            _processTimer = null;
+            // 停止Channel写入
+            _pendingTexts?.Writer.Complete();
 
-            // 等待正在进行的任务完成（最多等待 2 秒）
-            await Task.Delay(100);
+            // 等待所有消费者任务完成（最多等待5秒）
+            if (_consumerTasks != null && _consumerTasks.Count > 0)
+            {
+                try
+                {
+                    await Task.WhenAll(_consumerTasks).WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                catch (OperationCanceledException)
+                {
+                    // 正常取消，忽略
+                }
+                catch (TimeoutException)
+                {
+                    await _logService.LogAsync("等待消费者任务完成超时", LogLevel.Warning);
+                }
+                _consumerTasks.Clear();
+                _consumerTasks = null;
+            }
 
             // 停止文件监控
             if (_fileWatcher != null)
@@ -176,12 +200,9 @@ namespace XUnity_LLMTranslatePlus.Services
                 _fileWatcher = null;
             }
 
-            // 清空队列和已处理集合
-            lock (_pendingTexts)
-            {
-                _pendingTexts.Clear();
-            }
-            
+            // 清空Channel和已处理集合
+            _pendingTexts = null;
+
             lock (_processedTexts)
             {
                 _processedTexts.Clear();
@@ -268,15 +289,17 @@ namespace XUnity_LLMTranslatePlus.Services
                 {
                     await _logService.LogAsync($"发现 {untranslated.Count} 条未翻译文本", LogLevel.Info);
 
-                    // 添加到待处理队列（检查是否已处理或已在队列中）
+                    // 添加到待处理Channel（检查是否已处理）
                     int addedCount = 0;
                     int removedFromCacheCount = 0;
                     var removedPreviews = new List<string>();
-                    
+
                     foreach (var entry in untranslated)
                     {
                         // 如果是未翻译的，从已处理集合中移除（允许重新翻译）
                         bool wasInCache = false;
+                        bool shouldAdd = false;
+
                         lock (_processedTexts)
                         {
                             if (_processedTexts.Contains(entry.Key))
@@ -285,8 +308,14 @@ namespace XUnity_LLMTranslatePlus.Services
                                 removedFromCacheCount++;
                                 wasInCache = true;
                             }
+
+                            // 检查是否应该添加（未在已处理集合中）
+                            if (!_processedTexts.Contains(entry.Key))
+                            {
+                                shouldAdd = true;
+                            }
                         }
-                        
+
                         if (wasInCache)
                         {
                             string preview = entry.Key.Length > 50
@@ -294,29 +323,28 @@ namespace XUnity_LLMTranslatePlus.Services
                                 : entry.Key;
                             removedPreviews.Add(preview);
                         }
-                        
-                        // 添加到队列
-                        lock (_pendingTexts)
+
+                        // 添加到Channel（非阻塞）
+                        if (shouldAdd && _pendingTexts != null)
                         {
-                            if (!_pendingTexts.Contains(entry.Key))
+                            if (_pendingTexts.Writer.TryWrite(entry.Key))
                             {
-                                _pendingTexts.Enqueue(entry.Key);
                                 addedCount++;
                             }
                         }
                     }
-                    
+
                     // 记录所有从缓存中移除的文本
                     foreach (var preview in removedPreviews)
                     {
                         await _logService.LogAsync($"[重新翻译] 从缓存中移除: {preview}", LogLevel.Info);
                     }
-                    
+
                     if (addedCount > 0)
                     {
                         await _logService.LogAsync($"新增 {addedCount} 条待翻译文本到队列", LogLevel.Info);
                     }
-                    
+
                     if (removedFromCacheCount > 0)
                     {
                         await _logService.LogAsync($"从缓存中移除 {removedFromCacheCount} 条需要重新翻译的文本", LogLevel.Info);
@@ -330,329 +358,154 @@ namespace XUnity_LLMTranslatePlus.Services
         }
 
         /// <summary>
-        /// 定时处理待翻译文本
+        /// 启动消费者任务池（持续并发翻译）
         /// </summary>
-        private void ProcessPendingTextsCallback(object? state)
+        private void StartConsumerTasks(AppConfig config)
         {
-            // 检查是否已请求取消
-            if (_cancellationTokenSource?.IsCancellationRequested == true)
+            _consumerTasks = new List<Task>();
+
+            // 创建固定数量的消费者任务
+            int consumerCount = config.MaxConcurrentTranslations;
+            for (int i = 0; i < consumerCount; i++)
             {
-                return;
+                int consumerId = i + 1;
+                var task = Task.Run(async () => await ConsumerTaskAsync(consumerId));
+                _consumerTasks.Add(task);
             }
-            
-            _ = Task.Run(ProcessPendingTextsAsync);
+
+            _logService.Log($"已启动 {consumerCount} 个并发翻译任务", LogLevel.Info);
         }
 
         /// <summary>
-        /// 处理待翻译文本
+        /// 消费者任务（持续从Channel读取并翻译）
         /// </summary>
-        private async Task ProcessPendingTextsAsync()
+        private async Task ConsumerTaskAsync(int consumerId)
         {
-            // 检查取消请求
-            if (_cancellationTokenSource?.IsCancellationRequested == true)
+            if (_pendingTexts == null || _cancellationTokenSource == null)
             {
                 return;
             }
 
-            if (!IsMonitoring || _parser == null || _monitoredFilePath == null)
-            {
-                return;
-            }
+            var cancellationToken = _cancellationTokenSource.Token;
 
-            var config = _configService.GetCurrentConfig();
-
-            // 检查错误阈值
-            if (_translationService.TotalFailed >= config.ErrorThreshold)
-            {
-                await _logService.LogAsync($"错误数量已达到阈值 ({config.ErrorThreshold})，停止监控", LogLevel.Error);
-                ErrorThresholdReached?.Invoke(this, $"翻译错误过多（{_translationService.TotalFailed}次），已自动停止监控。请检查API配置和网络连接。");
-                await StopMonitoringAsync();
-                return;
-            }
-
-            // 统一使用批量处理方式，根据 MaxConcurrentTranslations 控制并发
-            await ProcessBatchAsync(config);
-        }
-
-        /// <summary>
-        /// 批量处理待翻译文本
-        /// </summary>
-        private async Task ProcessBatchAsync(AppConfig config)
-        {
-            // 从队列中取出一批待处理文本
-            // 每次处理的数量为并发数的2倍，既保证效率又避免一次取太多
-            var textsToProcess = new List<string>();
-            lock (_pendingTexts)
-            {
-                int batchSize = Math.Max(1, config.MaxConcurrentTranslations * 2);
-                int count = Math.Min(batchSize, _pendingTexts.Count);
-                for (int i = 0; i < count; i++)
-                {
-                    if (_pendingTexts.Count > 0)
-                    {
-                        textsToProcess.Add(_pendingTexts.Dequeue());
-                    }
-                }
-            }
-
-            if (textsToProcess.Count == 0)
-            {
-                return;
-            }
-
-            // 过滤已处理的文本
-            var filteredTexts = new List<string>();
-            lock (_processedTexts)
-            {
-                foreach (var text in textsToProcess)
-                {
-                    if (!_processedTexts.Contains(text))
-                    {
-                        _processedTexts.Add(text);
-                        filteredTexts.Add(text);
-                    }
-                }
-            }
-
-            if (filteredTexts.Count == 0)
-            {
-                await _logService.LogAsync($"批次中的所有文本都已处理，跳过", LogLevel.Debug);
-                return;
-            }
-
-            await _logService.LogAsync($"开始批量翻译 {filteredTexts.Count} 条文本（最大并发: {config.MaxConcurrentTranslations}）", LogLevel.Info);
+            await _logService.LogAsync($"[消费者{consumerId}] 已启动", LogLevel.Debug);
 
             try
             {
-                // 验证哪些文本仍需翻译
-                var currentEntries = await _parser!.ParseFileAsync(_monitoredFilePath!);
-                var textsNeedTranslation = new List<string>();
-
-                foreach (var text in filteredTexts)
+                // 持续从Channel读取直到取消或Channel关闭
+                await foreach (var text in _pendingTexts.Reader.ReadAllAsync(cancellationToken))
                 {
-                    var entry = currentEntries.FirstOrDefault(e => e.Key == text);
-                    if (entry != null && !entry.IsTranslated)
+                    // 检查是否已停止监控
+                    if (!IsMonitoring || _parser == null || _monitoredFilePath == null)
                     {
-                        textsNeedTranslation.Add(text);
-
-                        // 调试日志：显示待翻译文本的前50个字符，便于追踪转义字符
-                        string preview = text.Length > 50
-                            ? text.AsSpan(0, 50).ToString() + "..."
-                            : text;
-                        if (text.Contains("\\n") || text.Contains("\\r") || text.Contains("\\t"))
-                        {
-                            await _logService.LogAsync($"[待翻译-含转义] {preview}", LogLevel.Info);
-                        }
+                        break;
                     }
-                }
 
-                if (textsNeedTranslation.Count == 0)
-                {
-                    await _logService.LogAsync($"批次中的所有文本都已被翻译，跳过", LogLevel.Info);
-                    return;
-                }
+                    // 检查错误阈值
+                    var config = _configService.GetCurrentConfig();
+                    if (_translationService.TotalFailed >= config.ErrorThreshold)
+                    {
+                        await _logService.LogAsync($"错误数量已达到阈值 ({config.ErrorThreshold})，停止监控", LogLevel.Error);
+                        ErrorThresholdReached?.Invoke(this, $"翻译错误过多（{_translationService.TotalFailed}次），已自动停止监控。请检查API配置和网络连接。");
+                        _ = StopMonitoringAsync();
+                        break;
+                    }
 
-                // 调用批量翻译服务（内部会并发处理）
-                var results = await _translationService.TranslateBatchAsync(textsNeedTranslation, config);
-
-                // 检查取消请求
-                if (_cancellationTokenSource?.IsCancellationRequested == true)
-                {
-                    await _logService.LogAsync($"批量翻译已取消", LogLevel.Info);
+                    // 检查是否已处理
+                    bool shouldProcess = false;
                     lock (_processedTexts)
                     {
-                        foreach (var text in filteredTexts)
+                        if (!_processedTexts.Contains(text))
                         {
-                            _processedTexts.Remove(text);
+                            _processedTexts.Add(text);
+                            shouldProcess = true;
                         }
                     }
-                    return;
-                }
 
-                // 防御性空检查
-                if (_parser == null || _monitoredFilePath == null)
-                {
-                    await _logService.LogAsync($"批量翻译完成但监控已停止，跳过保存", LogLevel.Warning);
-                    return;
-                }
-
-                // 更新所有翻译结果
-                int successCount = 0;
-                foreach (var result in results)
-                {
-                    if (!string.Equals(result.Key, result.Value, StringComparison.Ordinal))
+                    if (!shouldProcess)
                     {
-                        _parser.UpdateTranslation(result.Key, result.Value);
-                        successCount++;
+                        await _logService.LogAsync($"[消费者{consumerId}] 跳过已处理文本", LogLevel.Debug);
+                        continue;
+                    }
+
+                    try
+                    {
+                        // 验证文本是否仍需翻译
+                        var currentEntries = await _parser.ParseFileAsync(_monitoredFilePath);
+                        var entry = currentEntries.FirstOrDefault(e => e.Key == text);
+
+                        if (entry == null || entry.IsTranslated)
+                        {
+                            await _logService.LogAsync($"[消费者{consumerId}] 跳过已翻译文本", LogLevel.Debug);
+                            continue;
+                        }
+
+                        // 调试日志
+                        string preview = text.Length > 50 ? text.AsSpan(0, 50).ToString() + "..." : text;
+                        if (text.Contains("\\n") || text.Contains("\\r") || text.Contains("\\t"))
+                        {
+                            await _logService.LogAsync($"[消费者{consumerId}][待翻译-含转义] {preview}", LogLevel.Info);
+                        }
+
+                        await _logService.LogAsync($"[消费者{consumerId}] 正在翻译: {preview}", LogLevel.Info);
+
+                        // 执行翻译
+                        string translated = await _translationService.TranslateTextAsync(text, config, cancellationToken);
+
+                        // 再次检查状态（翻译可能耗时较长）
+                        if (!IsMonitoring || _parser == null || _monitoredFilePath == null)
+                        {
+                            break;
+                        }
+
+                        // 如果翻译结果和原文一致，跳过保存
+                        if (string.Equals(text, translated, StringComparison.Ordinal))
+                        {
+                            await _logService.LogAsync($"[消费者{consumerId}] 跳过（原文和译文相同）", LogLevel.Info);
+                            continue;
+                        }
+
+                        // 更新翻译并保存
+                        _parser.UpdateTranslation(text, translated);
+                        await _parser.SaveFileAsync(_monitoredFilePath);
+
+                        await _logService.LogAsync($"[消费者{consumerId}] 翻译完成: {preview} -> {translated}", LogLevel.Info);
 
                         // 通知 UI
                         EntryTranslated?.Invoke(this, new TranslationEntry
                         {
-                            Key = result.Key,
-                            Value = result.Value,
+                            Key = text,
+                            Value = translated,
                             IsTranslated = true
                         });
                     }
-                }
-
-                // 一次性保存文件
-                if (successCount > 0)
-                {
-                    await _parser.SaveFileAsync(_monitoredFilePath);
-                    await _logService.LogAsync($"批量翻译完成: 成功 {successCount}/{filteredTexts.Count} 条", LogLevel.Info);
-                }
-            }
-            catch (Exception ex)
-            {
-                await _logService.LogAsync($"批量翻译失败: {ex.Message}", LogLevel.Error);
-
-                // 翻译失败时从已处理集合中移除，允许重试
-                lock (_processedTexts)
-                {
-                    foreach (var text in filteredTexts)
+                    catch (OperationCanceledException)
                     {
-                        _processedTexts.Remove(text);
+                        // 取消操作，退出循环
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        await _logService.LogAsync($"[消费者{consumerId}] 翻译失败: {ex.Message}", LogLevel.Error);
+
+                        // 翻译失败时从已处理集合中移除，允许重试
+                        lock (_processedTexts)
+                        {
+                            _processedTexts.Remove(text);
+                        }
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// 单条处理待翻译文本
-        /// </summary>
-        private async Task ProcessSingleAsync(AppConfig config)
-        {
-            // 每次只处理一条
-            string? textToProcess = null;
-            lock (_pendingTexts)
+            catch (OperationCanceledException)
             {
-                if (_pendingTexts.Count > 0)
-                {
-                    textToProcess = _pendingTexts.Dequeue();
-                }
-            }
-
-            if (textToProcess == null)
-            {
-                return;
-            }
-
-            // 立即标记为正在处理，防止在翻译期间被重复加入队列
-            bool wasAlreadyProcessed = false;
-            lock (_processedTexts)
-            {
-                if (_processedTexts.Contains(textToProcess))
-                {
-                    wasAlreadyProcessed = true;
-                }
-                else
-                {
-                    _processedTexts.Add(textToProcess);
-                }
-            }
-
-            // 如果已经处理过，直接返回
-            if (wasAlreadyProcessed)
-            {
-                await _logService.LogAsync($"跳过翻译（已标记为处理）: {textToProcess}", LogLevel.Debug);
-                return;
-            }
-
-            // 检查取消请求
-            if (_cancellationTokenSource?.IsCancellationRequested == true)
-            {
-                lock (_processedTexts)
-                {
-                    _processedTexts.Remove(textToProcess);
-                }
-                return;
-            }
-
-            if (!IsMonitoring || _parser == null || _monitoredFilePath == null)
-            {
-                lock (_processedTexts)
-                {
-                    _processedTexts.Remove(textToProcess);
-                }
-                return;
-            }
-
-            // 再次检查错误阈值
-            if (_translationService.TotalFailed >= config.ErrorThreshold)
-            {
-                await _logService.LogAsync($"错误数量已达到阈值 ({config.ErrorThreshold})，停止监控", LogLevel.Error);
-                ErrorThresholdReached?.Invoke(this, $"翻译错误过多（{_translationService.TotalFailed}次），已自动停止监控。请检查API配置和网络连接。");
-                await StopMonitoringAsync();
-                return;
-            }
-
-            try
-            {
-                // 验证文本是否仍需翻译
-                var currentEntries = await _parser.ParseFileAsync(_monitoredFilePath);
-                var entry = currentEntries.FirstOrDefault(e => e.Key == textToProcess);
-
-                if (entry == null || !string.Equals(entry.Key, entry.Value, StringComparison.Ordinal))
-                {
-                    await _logService.LogAsync($"跳过翻译（文本已被翻译或不存在）: {textToProcess}", LogLevel.Info);
-                    return;
-                }
-
-                await _logService.LogAsync($"正在翻译: {textToProcess}", LogLevel.Info);
-
-                string translated = await _translationService.TranslateTextAsync(textToProcess, config);
-
-                // 检查取消请求
-                if (_cancellationTokenSource?.IsCancellationRequested == true)
-                {
-                    await _logService.LogAsync($"翻译已取消: {textToProcess}", LogLevel.Info);
-                    lock (_processedTexts)
-                    {
-                        _processedTexts.Remove(textToProcess);
-                    }
-                    return;
-                }
-
-                // 防御性空检查
-                if (_parser == null || _monitoredFilePath == null)
-                {
-                    await _logService.LogAsync($"翻译完成但监控已停止，跳过保存: {textToProcess}", LogLevel.Warning);
-                    return;
-                }
-
-                // 如果翻译结果和原文一致，跳过保存
-                if (string.Equals(textToProcess, translated, StringComparison.Ordinal))
-                {
-                    await _logService.LogAsync($"跳过翻译（原文和译文相同）: {textToProcess}", LogLevel.Info);
-                    return;
-                }
-
-                // 更新翻译
-                _parser.UpdateTranslation(textToProcess, translated);
-
-                // 保存文件
-                await _parser.SaveFileAsync(_monitoredFilePath);
-
-                await _logService.LogAsync($"翻译完成: {textToProcess} -> {translated}", LogLevel.Info);
-
-                // 通知 UI
-                EntryTranslated?.Invoke(this, new TranslationEntry
-                {
-                    Key = textToProcess,
-                    Value = translated,
-                    IsTranslated = true
-                });
+                // 正常取消，忽略
             }
             catch (Exception ex)
             {
-                await _logService.LogAsync($"翻译失败: {textToProcess} - {ex.Message}", LogLevel.Error);
-
-                // 翻译失败时从已处理集合中移除，允许重试
-                lock (_processedTexts)
-                {
-                    _processedTexts.Remove(textToProcess);
-                }
+                await _logService.LogAsync($"[消费者{consumerId}] 异常退出: {ex.Message}", LogLevel.Error);
             }
+
+            await _logService.LogAsync($"[消费者{consumerId}] 已停止", LogLevel.Debug);
         }
 
         /// <summary>
@@ -681,10 +534,11 @@ namespace XUnity_LLMTranslatePlus.Services
         /// </summary>
         public int GetPendingCount()
         {
-            lock (_pendingTexts)
-            {
-                return _pendingTexts.Count;
-            }
+            // Channel不直接提供Count，返回Reader中可用的近似数量
+            // 注意：这是一个估算值，实际数量可能略有不同
+            return _pendingTexts?.Reader.CanCount == true
+                ? _pendingTexts.Reader.Count
+                : 0;
         }
 
         public void Dispose()

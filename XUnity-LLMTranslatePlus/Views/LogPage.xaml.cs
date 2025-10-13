@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Channels;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Storage;
@@ -26,24 +29,35 @@ namespace XUnity_LLMTranslatePlus.Views
         private readonly TranslationService? _translationService;
         private readonly FileMonitorService? _fileMonitorService;
         private LogLevel _currentFilter = LogLevel.Info;
-        
+
         // 保存复选框状态（使用静态字段在整个应用生命周期内保持）
         private static bool _showDebug = true;
         private static bool _showInfo = true;
         private static bool _showWarning = true;
         private static bool _showError = true;
-        
+
         // 标志：是否正在初始化（避免在加载时触发状态保存）
         private bool _isInitializing = false;
+
+        // UI更新Channel（批量缓冲日志以减少UI更新频率）
+        private readonly Channel<LogEntry> _uiLogChannel;
+        private DispatcherQueueTimer? _batchUpdateTimer;
 
         public LogPage()
         {
             this.InitializeComponent();
 
+            // 初始化UI更新Channel（无界通道）
+            _uiLogChannel = Channel.CreateUnbounded<LogEntry>(new UnboundedChannelOptions
+            {
+                SingleReader = true,  // 只有UI线程读取
+                SingleWriter = false  // 多个线程可能写入
+            });
+
             _logService = App.GetService<LogService>();
             _translationService = App.GetService<TranslationService>();
             _fileMonitorService = App.GetService<FileMonitorService>();
-            
+
             if (_logService != null)
             {
                 _logService.LogAdded += OnLogAdded;
@@ -66,6 +80,12 @@ namespace XUnity_LLMTranslatePlus.Views
 
             // 页面加载时恢复复选框状态
             this.Loaded += LogPage_Loaded;
+
+            // 页面卸载时停止定时器
+            this.Unloaded += LogPage_Unloaded;
+
+            // 启动批量更新定时器（每200ms批量处理日志）
+            StartBatchUpdateTimer();
         }
 
         private void LogPage_Loaded(object sender, RoutedEventArgs e)
@@ -96,10 +116,9 @@ namespace XUnity_LLMTranslatePlus.Views
 
         private void OnLogAdded(object? sender, LogEntry log)
         {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                AddLogEntry(log);
-            });
+            // 不再直接更新UI，而是写入Channel缓冲
+            // 定时器会批量处理这些日志，大幅减少UI更新频率
+            _uiLogChannel.Writer.TryWrite(log);
         }
 
         private void AddLogEntry(LogEntry log)
@@ -131,6 +150,92 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 LogListView.ScrollIntoView(LogListView.Items[0]);
             }
+        }
+
+        /// <summary>
+        /// 启动批量更新定时器
+        /// </summary>
+        private void StartBatchUpdateTimer()
+        {
+            _batchUpdateTimer = DispatcherQueue.CreateTimer();
+            _batchUpdateTimer.Interval = TimeSpan.FromMilliseconds(200); // 每200ms批量处理一次
+            _batchUpdateTimer.Tick += BatchUpdateTimer_Tick;
+            _batchUpdateTimer.Start();
+        }
+
+        /// <summary>
+        /// 批量更新定时器触发
+        /// </summary>
+        private void BatchUpdateTimer_Tick(object? sender, object e)
+        {
+            BatchProcessLogs();
+        }
+
+        /// <summary>
+        /// 批量处理Channel中的日志
+        /// </summary>
+        private void BatchProcessLogs()
+        {
+            var batch = new List<LogEntry>();
+
+            // 从Channel中读取最多50条日志（避免单次处理过多）
+            while (batch.Count < 50 && _uiLogChannel.Reader.TryRead(out var log))
+            {
+                batch.Add(log);
+            }
+
+            if (batch.Count == 0)
+            {
+                return;
+            }
+
+            // 批量处理日志：过滤、转换、插入
+            var displayBatch = new List<LogEntryDisplay>();
+            foreach (var log in batch)
+            {
+                // 检查过滤器
+                if (ShouldShowLogByCheckBox(log.Level))
+                {
+                    displayBatch.Add(new LogEntryDisplay
+                    {
+                        Timestamp = log.Timestamp,
+                        Level = log.Level,
+                        Message = log.Message,
+                        LevelColor = GetLevelColor(log.Level)
+                    });
+                }
+            }
+
+            // 一次性插入所有日志（只触发一次CollectionChanged）
+            if (displayBatch.Count > 0)
+            {
+                // 从顶部插入
+                for (int i = displayBatch.Count - 1; i >= 0; i--)
+                {
+                    LogEntries.Insert(0, displayBatch[i]);
+                }
+
+                // 限制显示数量
+                while (LogEntries.Count > 500)
+                {
+                    LogEntries.RemoveAt(LogEntries.Count - 1);
+                }
+
+                // 自动滚动到顶部
+                if (AutoScrollToggle?.IsOn == true && LogListView != null && LogListView.Items.Count > 0)
+                {
+                    LogListView.ScrollIntoView(LogListView.Items[0]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 页面卸载时停止定时器
+        /// </summary>
+        private void LogPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            _batchUpdateTimer?.Stop();
+            _uiLogChannel.Writer.TryComplete();
         }
 
         private bool ShouldShowLog(string level)
