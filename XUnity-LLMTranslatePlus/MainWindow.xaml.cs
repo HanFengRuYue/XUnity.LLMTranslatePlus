@@ -1,7 +1,9 @@
 using System;
+using System.IO;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
 using XUnity_LLMTranslatePlus.Views;
 
@@ -19,8 +21,23 @@ namespace XUnity_LLMTranslatePlus
             // 设置窗口标题
             this.Title = "XUnity大语言模型翻译Plus";
 
-            // 设置窗口图标（任务栏图标）
-            AppWindow.SetIcon("ICON.ico");
+            // 设置窗口图标（任务栏图标）- 使用绝对路径以支持发布后的单文件部署
+            var iconPath = Path.Combine(AppContext.BaseDirectory, "ICON.ico");
+            if (File.Exists(iconPath))
+            {
+                AppWindow.SetIcon(iconPath);
+
+                // 同时设置标题栏图标
+                try
+                {
+                    var bitmapImage = new BitmapImage(new Uri(iconPath));
+                    TitleBarIcon.Source = bitmapImage;
+                }
+                catch
+                {
+                    // 如果加载失败，标题栏图标将保持为空
+                }
+            }
 
             // 配置自定义标题栏
             ExtendsContentIntoTitleBar = true;

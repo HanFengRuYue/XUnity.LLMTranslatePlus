@@ -122,3 +122,5 @@ Write-Host "     (Automatically installed from Microsoft Store or can be manuall
 Write-Host ""
 Write-Host "See RUNTIME-INSTALL.md for detailed installation instructions." -ForegroundColor Cyan
 Write-Host ""
+Write-Host "Press any key to exit..." -ForegroundColor Gray
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
