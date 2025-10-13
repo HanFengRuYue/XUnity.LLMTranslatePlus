@@ -49,6 +49,11 @@ namespace XUnity_LLMTranslatePlus.Services
             }
         }
 
+        /// <summary>
+        /// 获取当前监控的文件路径
+        /// </summary>
+        public string? MonitoredFilePath => _monitoredFilePath;
+
         public FileMonitorService(
             TranslationService translationService,
             LogService logService,

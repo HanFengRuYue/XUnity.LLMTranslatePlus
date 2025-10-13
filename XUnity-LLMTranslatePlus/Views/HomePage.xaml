@@ -14,6 +14,26 @@
             <!-- 页面标题 -->
             <TextBlock Text="主页" Style="{StaticResource TitleTextBlockStyle}"/>
 
+            <!-- 当前监控的文件路径 -->
+            <Border x:Name="FilePathBorder"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16"
+                    Visibility="Collapsed">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="监控文件"
+                               Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                    <TextBlock x:Name="FilePathText"
+                               Text=""
+                               TextWrapping="Wrap"
+                               IsTextSelectionEnabled="True"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Style="{StaticResource CaptionTextBlockStyle}"/>
+                </StackPanel>
+            </Border>
+
             <!-- 信息提示栏 -->
             <InfoBar
                 x:Name="StatusInfoBar"
@@ -68,12 +88,12 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 翻译队列卡片 -->
+                <!-- API处理中卡片 -->
                 <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="8">
-                        <TextBlock Text="翻译队列" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                        <TextBlock Text="API处理中" Style="{StaticResource BodyStrongTextBlockStyle}"/>
                         <TextBlock x:Name="QueueCountText" Text="0"
                                    Style="{StaticResource SubtitleTextBlockStyle}"
                                    Foreground="{ThemeResource SystemFillColorAttentionBrush}"/>

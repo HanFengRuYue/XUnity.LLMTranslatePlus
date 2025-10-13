@@ -365,27 +365,78 @@ var semaphore = new SemaphoreSlim(config.MaxConcurrentTranslations, config.MaxCo
 
 Batch size = `config.MaxConcurrentTranslations * 2` for optimal throughput.
 
+**MaxConcurrentTranslations**: Default is 3 (safe for most APIs), configurable range 1-100 in UI (ApiConfigPage.xaml:209).
+
+### Two-Queue Translation Pipeline
+
+**Critical**: The system uses TWO separate queues by design - they cannot be merged:
+
+1. **`_pendingTexts` Queue** (FileMonitorService:29)
+   - Texts detected as untranslated, waiting to be sent to API
+   - Displayed as "待翻译" in UI (HomePage)
+   - Represents: `Detected but not yet sent to API`
+
+2. **`_translatingCount` Counter** (TranslationService:27)
+   - Active API calls currently in flight
+   - Displayed as "API处理中" in UI (HomePage)
+   - Represents: `Sent to API, awaiting response`
+
+**Pipeline flow:**
+```
+Untranslated detected → _pendingTexts → API call → _translatingCount → Response → Translated
+                        (待翻译)                     (API处理中)
+```
+
+This separation is necessary for:
+- Throttling API calls independently from detection
+- Accurate progress tracking at each stage
+- Proper cancellation and error handling per stage
+
 ## UI Patterns
 
-### Custom Title Bar
+### Custom Title Bar and Window Icon
 **Location**: `MainWindow.xaml`, `MainWindow.xaml.cs`
 
 The application uses a custom title bar to match the Mica backdrop aesthetic:
 
 ```csharp
-// In MainWindow constructor
+// In MainWindow constructor - ORDER MATTERS
+this.Title = "XUnity大语言模型翻译Plus";  // Window title
+AppWindow.SetIcon("ICON.ico");            // Taskbar and Alt+Tab icon
+
 ExtendsContentIntoTitleBar = true;
 SetTitleBar(AppTitleBar);
 ```
 
 ```xaml
-<!-- Custom title bar grid -->
+<!-- Custom title bar grid with app icon -->
 <Grid x:Name="AppTitleBar" Grid.Row="0" Height="48">
-    <!-- App icon and title content -->
+    <StackPanel Orientation="Horizontal">
+        <Image Source="ms-appx:///Assets/Square44x44Logo.targetsize-24_altform-unplated.png"
+               Width="16" Height="16" />
+        <TextBlock Text="XUnity大语言模型翻译Plus" />
+    </StackPanel>
 </Grid>
 ```
 
-**Important**: The title bar must be set BEFORE any navigation occurs. Title bar element must be non-interactive.
+**Important**:
+- `AppWindow.SetIcon()` sets the taskbar icon, Alt+Tab icon, and window chrome icon
+- The title bar must be set BEFORE any navigation occurs
+- Title bar element must be non-interactive
+- Use `ms-appx:///` URI scheme for embedded assets in title bar
+
+**Window Positioning**: Window is centered on startup using `DisplayArea` API:
+```csharp
+private void CenterWindow()
+{
+    var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest)?.WorkArea;
+    if (area == null) return;
+
+    var x = (area.Value.Width - AppWindow.Size.Width) / 2;
+    var y = (area.Value.Height - AppWindow.Size.Height) / 2;
+    AppWindow.Move(new PointInt32(x, y));
+}
+```
 
 ### Event-Driven Updates
 Services communicate with UI through events:
@@ -406,6 +457,38 @@ service.EntryTranslated += (sender, entry) =>
 ```
 
 Always use `DispatcherQueue.TryEnqueue()` when updating UI from non-UI threads.
+
+### File Path Display Pattern
+**Location**: `HomePage.xaml`, `TextEditorPage.xaml`
+
+Both HomePage and TextEditorPage display the currently monitored/edited file path:
+
+```csharp
+// In FileMonitorService - expose current file path
+public string? MonitoredFilePath => _monitoredFilePath;
+
+// In HomePage - display when monitoring starts
+var filePath = _fileMonitorService.MonitoredFilePath;
+if (!string.IsNullOrEmpty(filePath))
+{
+    FilePathText.Text = filePath;
+    FilePathBorder.Visibility = Visibility.Visible;
+}
+```
+
+```xaml
+<!-- Collapsible card showing file path -->
+<Border x:Name="FilePathBorder" Visibility="Collapsed">
+    <StackPanel>
+        <TextBlock Text="监控文件"/>
+        <TextBlock x:Name="FilePathText"
+                   TextWrapping="Wrap"
+                   IsTextSelectionEnabled="True"/>
+    </StackPanel>
+</Border>
+```
+
+Pattern: File path cards are initially collapsed, shown when file is loaded/monitored, and hidden when stopped.
 
 ### NavigationView Structure
 **Location**: `MainWindow.xaml`
@@ -473,7 +556,7 @@ This sends "Hello" with prompt "Translate to Chinese:" to verify connectivity.
 ## Performance Considerations
 
 - **Batch Operations**: Always prefer batch translation over individual calls when processing multiple entries
-- **Concurrent Limits**: Default `MaxConcurrentTranslations` is 3. Higher values may cause rate limiting.
+- **Concurrent Limits**: Default `MaxConcurrentTranslations` is 3, configurable up to 100. Higher values may cause rate limiting or API errors depending on the provider.
 - **Log Verbosity**: Use `LogLevel.Debug` sparingly - it generates significant I/O
 - **Memory**: TextFileParser keeps file contents in memory. Large translation files (>100K entries) may need optimization.
 - **UI Performance**:
@@ -500,10 +583,19 @@ This sends "Hello" with prompt "Translate to Chinese:" to verify connectivity.
   - Disabled PDB generation for Release builds (5-20MB savings)
   - Removed ineffective PublishTrimmed setting (WinUI 3 doesn't support IL trimming)
   - Added `EnableMsixTooling=true` for single-file deployment support
-- **Deployment Mode Change** (Latest):
+- **Deployment Mode Change**:
   - Switched from self-contained to framework-dependent deployment (53% size reduction)
   - Single exe size reduced from ~84MB to ~40MB
   - Users must now install .NET 9 Desktop Runtime and Windows App SDK 1.8 Runtime
   - Added environment variable setup in `App.xaml.cs` for single-file support
   - Created `RUNTIME-INSTALL.md` with user installation instructions
   - Single-file deployment without compression (compression not supported for framework-dependent)
+- **Recent UI Improvements** (Latest):
+  - Fixed window and taskbar icon display with `AppWindow.SetIcon("ICON.ico")`
+  - Fixed title bar icon using `ms-appx:///` URI scheme for embedded assets
+  - Added automatic window centering on startup using `DisplayArea` API
+  - Increased MaxConcurrentTranslations limit from 20 to 100
+  - Added file path display to HomePage and TextEditorPage for better user feedback
+  - Renamed "翻译队列" to "API处理中" for clarity in two-queue pipeline
+  - Removed non-functional "全部翻译" button from TextEditorPage
+  - Added `MonitoredFilePath` property to FileMonitorService for UI access

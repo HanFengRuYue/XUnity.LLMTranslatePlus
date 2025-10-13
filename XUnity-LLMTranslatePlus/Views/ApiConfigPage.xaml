@@ -206,7 +206,7 @@
                         <NumberBox x:Name="MaxConcurrentTranslationsNumberBox"
                                    Value="3"
                                    Minimum="1"
-                                   Maximum="20"
+                                   Maximum="100"
                                    SpinButtonPlacementMode="Inline"
                                    ValueChanged="MaxConcurrentTranslationsNumberBox_ValueChanged"/>
                     </StackPanel>

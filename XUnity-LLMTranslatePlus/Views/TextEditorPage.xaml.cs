@@ -151,7 +151,12 @@ namespace XUnity_LLMTranslatePlus.Views
         {
             DispatcherQueue.TryEnqueue(() =>
             {
-                // LoadedFilePathText.Text = filePath;
+                // 显示文件路径
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    EditorFilePathText.Text = filePath;
+                    EditorFilePathBorder.Visibility = Visibility.Visible;
+                }
                 RefreshEntries();
                 ShowEmptyState(false);
             });
@@ -346,19 +351,6 @@ namespace XUnity_LLMTranslatePlus.Views
                     FilteredEntries.Add(entry);
                 }
             }
-        }
-
-        private async void TranslateAllButton_Click(object sender, RoutedEventArgs e)
-        {
-            // TODO: 实现批量翻译功能
-            ContentDialog dialog = new ContentDialog
-            {
-                Title = "批量翻译",
-                Content = "此功能将在后续版本中实现",
-                CloseButtonText = "确定",
-                XamlRoot = this.XamlRoot
-            };
-            await dialog.ShowAsync();
         }
 
         private async void ImportButton_Click(object sender, RoutedEventArgs e)

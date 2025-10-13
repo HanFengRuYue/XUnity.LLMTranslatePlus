@@ -1,9 +1,6 @@
 {
   "profiles": {
-    "XUnity-LLMTranslatePlus (Package)": {
-      "commandName": "MsixPackage"
-    },
-    "XUnity-LLMTranslatePlus (Unpackaged)": {
+    "XUnity-LLMTranslatePlus": {
       "commandName": "Project"
     }
   }

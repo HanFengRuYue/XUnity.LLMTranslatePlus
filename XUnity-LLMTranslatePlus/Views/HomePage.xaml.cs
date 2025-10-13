@@ -93,6 +93,14 @@ namespace XUnity_LLMTranslatePlus.Views
                 StatusInfoBar.Title = "翻译服务运行中";
                 StatusInfoBar.Message = "正在后台自动翻译";
                 StatusInfoBar.IsOpen = true;
+
+                // 显示监控文件路径
+                var filePath = _fileMonitorService.MonitoredFilePath;
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    FilePathText.Text = filePath;
+                    FilePathBorder.Visibility = Visibility.Visible;
+                }
             }
             else
             {
@@ -100,6 +108,9 @@ namespace XUnity_LLMTranslatePlus.Views
                 StartStopButton.Content = "开始翻译";
                 StatusText.Text = "已停止";
                 StatusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SystemFillColorCriticalBrush"];
+
+                // 隐藏文件路径
+                FilePathBorder.Visibility = Visibility.Collapsed;
             }
 
             // 更新统计信息
@@ -168,6 +179,13 @@ namespace XUnity_LLMTranslatePlus.Views
                     StatusInfoBar.Title = "翻译服务已启动";
                     StatusInfoBar.Message = $"正在翻译: {e.FilePath}";
                     StatusInfoBar.IsOpen = true;
+
+                    // 显示文件路径
+                    if (!string.IsNullOrEmpty(e.FilePath))
+                    {
+                        FilePathText.Text = e.FilePath;
+                        FilePathBorder.Visibility = Visibility.Visible;
+                    }
                 }
                 else
                 {
@@ -179,6 +197,9 @@ namespace XUnity_LLMTranslatePlus.Views
                     StatusInfoBar.Title = "翻译服务已停止";
                     StatusInfoBar.Message = "点击\"开始翻译\"按钮开始翻译。";
                     StatusInfoBar.IsOpen = true;
+
+                    // 隐藏文件路径
+                    FilePathBorder.Visibility = Visibility.Collapsed;
                 }
             });
         }
