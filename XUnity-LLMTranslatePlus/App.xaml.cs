@@ -19,6 +19,10 @@ namespace XUnity_LLMTranslatePlus
         /// </summary>
         public App()
         {
+            // Required for PublishSingleFile with framework-dependent deployment
+            // This allows Windows App SDK to locate runtime components extracted from the single file
+            Environment.SetEnvironmentVariable("MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
+
             InitializeComponent();
             ConfigureServices();
         }

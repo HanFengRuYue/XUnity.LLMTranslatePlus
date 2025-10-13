@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **XUnity大语言模型翻译Plus** - A WinUI 3 application that integrates with XUnity.AutoTranslator to provide AI-powered game text translation using Large Language Models.
 
 - **Framework**: .NET 9.0 + WinUI 3
-- **Runtime**: Unpackaged (WindowsPackageType=None, WindowsAppSDKSelfContained=true)
+- **Deployment**: Framework-Dependent Single-File (WindowsAppSDKSelfContained=false, SelfContained=false)
+- **Runtime Requirements**: .NET 9 Desktop Runtime + Windows App SDK 1.8 Runtime
 - **Target**: Windows 10.0.26100.0 (Min: 10.0.17763.0)
 - **Language**: C# 13.0 with nullable reference types enabled
 
@@ -37,8 +38,8 @@ dotnet run --configuration Release
 
 ### Publishing
 ```bash
-# Self-contained publish for distribution
-dotnet publish --configuration Release --runtime win-x64 --self-contained true
+# Framework-dependent single-file publish (recommended)
+dotnet publish --configuration Release --runtime win-x64 --self-contained false /p:PublishSingleFile=true
 
 # One-click Release build script (recommended)
 .\Build-Release.ps1
@@ -51,7 +52,9 @@ dotnet publish --configuration Release --runtime win-x64 --self-contained true
 ```
 
 **Important Notes**:
-- This project uses WinUI 3 in Unpackaged mode, so MSIX packaging is disabled. The executable runs directly without requiring installation.
+- This project uses **framework-dependent deployment** - users must install .NET 9 Desktop Runtime and Windows App SDK 1.8 Runtime. See `RUNTIME-INSTALL.md` for installation instructions.
+- The project uses WinUI 3 in Unpackaged mode, so MSIX packaging is disabled. The executable runs directly without requiring installation.
+- **Single-file deployment**: Outputs a single .exe file (~40MB) that extracts dependencies at runtime. Requires environment variable setup in `App.xaml.cs`.
 - **PublishTrimmed is DISABLED** - IL trimming is not supported by WinUI 3/Windows App SDK (GitHub issue #2478). Setting it has no effect.
 - **ReadyToRun is DISABLED** for Release builds to reduce executable size by 20-40%. Trade-off: ~100-200ms slower startup.
 - **PDB generation is DISABLED** for Release builds (`DebugType=none`) to eliminate debug symbols (~5-20MB savings).
@@ -137,13 +140,15 @@ public async Task<string> TranslateAsync(..., CancellationToken cancellationToke
 
 Always propagate CancellationToken through async call chains.
 
-### 7. Release Build Optimizations
-**Location**: `XUnity-LLMTranslatePlus.csproj` (Publish Properties section)
+### 7. Framework-Dependent Deployment
+**Location**: `XUnity-LLMTranslatePlus.csproj`, `App.xaml.cs`
 
-Release builds are optimized for size rather than startup performance:
+The project uses framework-dependent deployment to reduce file size by 53% (from ~84MB to ~40MB):
 
 ```xml
 <PropertyGroup>
+  <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+  <SelfContained>false</SelfContained>
   <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">False</PublishReadyToRun>
 </PropertyGroup>
 
@@ -153,12 +158,27 @@ Release builds are optimized for size rather than startup performance:
 </PropertyGroup>
 ```
 
+**Critical**: Single-file framework-dependent deployment requires setting an environment variable in `App.xaml.cs` constructor:
+
+```csharp
+public App()
+{
+    // Required for PublishSingleFile with framework-dependent deployment
+    Environment.SetEnvironmentVariable("MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
+
+    InitializeComponent();
+    ConfigureServices();
+}
+```
+
 **Key Points:**
+- **Framework-dependent**: Users must install .NET 9 Desktop Runtime and Windows App SDK 1.8 Runtime before running
+- **Size**: Single exe file is ~40MB (vs. ~84MB for self-contained), requires 0MB runtime installation by user
 - **ReadyToRun disabled**: R2R pre-compilation increases executable size by 20-40% for marginally faster startup. Disabled to prioritize size.
 - **PDB generation disabled**: Debug symbols add 5-20MB and are unnecessary for production builds.
 - **IL Trimming unavailable**: `PublishTrimmed` has no effect because WinUI 3/Windows App SDK doesn't support it yet.
-- **Single-file deployment**: Requires `EnableMsixTooling=true` even in unpackaged mode for embedded resources.pri generation.
-- **Expected size**: Core Windows App SDK runtime is ~150-200MB and cannot be reduced until Microsoft implements IL trimming support.
+- **Single-file deployment**: Requires `EnableMsixTooling=true` even in unpackaged mode for embedded resources.pri generation. Cannot use compression with framework-dependent mode.
+- **Build warnings**: MSBuild will warn that "PublishSingleFile is recommended only for Self-Contained apps" - this is just a recommendation, not an error.
 
 ## Architecture Patterns
 
@@ -239,8 +259,15 @@ key2="value with spaces"
 
 **Location**: `App.xaml.cs`
 
-Services are configured in the `ConfigureServices()` method:
+The App constructor performs two critical setup tasks:
 
+1. **Environment Variable for Single-File Deployment** (MUST be first):
+```csharp
+Environment.SetEnvironmentVariable("MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
+```
+This allows Windows App SDK to locate runtime components when deployed as a single file.
+
+2. **Service Configuration** via `ConfigureServices()`:
 ```csharp
 services.AddHttpClient();  // Required for ApiClient
 services.AddSingleton<LogService>();
@@ -424,9 +451,14 @@ Pages are instantiated on navigation. No page caching.
 
 8. **Custom Title Bar**: The title bar element (`AppTitleBar`) must be non-interactive. Interactive elements in the title bar area will not receive input events.
 
-9. **Build Size Limitations**: Release builds will be ~150-200MB+ due to self-contained Windows App SDK runtime. This cannot be reduced further until Microsoft implements IL trimming support for WinUI 3. PublishTrimmed setting has no effect.
+9. **Framework-Dependent Deployment Size**: Release builds produce a ~40MB single exe file. Users must install .NET 9 Desktop Runtime and Windows App SDK 1.8 Runtime. See `RUNTIME-INSTALL.md` for user installation instructions.
 
-10. **Single-File Deployment**: WinUI 3 single-file publish requires `EnableMsixTooling=true` even in unpackaged mode, otherwise build fails with error about resources.pri generation.
+10. **Single-File Deployment Requirements**:
+    - WinUI 3 single-file publish requires `EnableMsixTooling=true` even in unpackaged mode, otherwise build fails with error about resources.pri generation.
+    - Framework-dependent single-file deployment cannot use compression (`EnableCompressionInSingleFile` is not supported).
+    - MUST set environment variable `MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY` in `App.xaml.cs` constructor before `InitializeComponent()`.
+
+11. **Build Warnings**: When building framework-dependent single-file, MSBuild will show warnings about "PublishSingleFile is recommended only for Self-Contained apps". These are recommendations, not errors. The build will succeed and the executable will work correctly if the environment variable is set.
 
 ## Testing Translation API
 
@@ -462,10 +494,16 @@ This sends "Hello" with prompt "Translate to Chinese:" to verify connectivity.
   - UI improvements: Updated status displays across HomePage and LogPage
   - Removed unused features: AI translation button in TextEditor, context weight slider (field reserved for future use)
   - Enhanced log export to export all logs (not just displayed subset)
-- **Build Optimizations** (Latest):
+- **Build Optimizations**:
   - Created `Build-Release.ps1` one-click build script for automated releases
   - Disabled ReadyToRun compilation for Release builds (20-40% size reduction, ~100-200ms slower startup)
   - Disabled PDB generation for Release builds (5-20MB savings)
   - Removed ineffective PublishTrimmed setting (WinUI 3 doesn't support IL trimming)
   - Added `EnableMsixTooling=true` for single-file deployment support
-  - Total size reduction: ~35-80MB per build
+- **Deployment Mode Change** (Latest):
+  - Switched from self-contained to framework-dependent deployment (53% size reduction)
+  - Single exe size reduced from ~84MB to ~40MB
+  - Users must now install .NET 9 Desktop Runtime and Windows App SDK 1.8 Runtime
+  - Added environment variable setup in `App.xaml.cs` for single-file support
+  - Created `RUNTIME-INSTALL.md` with user installation instructions
+  - Single-file deployment without compression (compression not supported for framework-dependent)

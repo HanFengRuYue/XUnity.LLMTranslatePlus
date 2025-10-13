@@ -54,8 +54,8 @@ if (-not $SkipClean) {
 Write-Host "[3/4] Publishing release build..." -ForegroundColor Yellow
 Write-Host "      Configuration: $Configuration" -ForegroundColor Gray
 Write-Host "      Runtime: $Runtime" -ForegroundColor Gray
-Write-Host "      Self-contained: Yes" -ForegroundColor Gray
-Write-Host "      Single file: Yes" -ForegroundColor Gray
+Write-Host "      Self-contained: No (Framework-Dependent)" -ForegroundColor Cyan
+Write-Host "      Single file: Yes (without compression)" -ForegroundColor Green
 Write-Host "      ReadyToRun: No (size optimization)" -ForegroundColor Gray
 Write-Host "      PDB files: No (disabled)" -ForegroundColor Gray
 Write-Host ""
@@ -64,11 +64,10 @@ try {
     dotnet publish $ProjectPath `
         --configuration $Configuration `
         --runtime $Runtime `
-        --self-contained true `
+        --self-contained false `
         --output $OutputDir `
         /p:PublishSingleFile=true `
         /p:IncludeNativeLibrariesForSelfExtract=true `
-        /p:EnableCompressionInSingleFile=true `
         /p:EnableMsixTooling=true
 
     if ($LASTEXITCODE -ne 0) {
@@ -106,13 +105,20 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Output directory: $(Resolve-Path $OutputDir)" -ForegroundColor White
 Write-Host "Total files: $FileCount" -ForegroundColor White
 Write-Host ""
-Write-Host "NOTE: WinUI 3 applications may include additional runtime files" -ForegroundColor DarkYellow
-Write-Host "      alongside the main executable. This is expected behavior." -ForegroundColor DarkYellow
+Write-Host "DEPLOYMENT MODE: Framework-Dependent" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "SIZE OPTIMIZATION INFO:" -ForegroundColor DarkYellow
-Write-Host "  - PDB files: Disabled (saves 5-20MB)" -ForegroundColor Gray
-Write-Host "  - ReadyToRun: Disabled (saves 20-40% size)" -ForegroundColor Gray
-Write-Host "  - Trade-off: Slightly slower startup (~100-200ms)" -ForegroundColor Gray
-Write-Host "  - Core WinUI 3 runtime (~150-200MB) cannot be reduced" -ForegroundColor Gray
-Write-Host "    until Microsoft implements IL trimming support" -ForegroundColor Gray
+Write-Host "SIZE OPTIMIZATION:" -ForegroundColor Green
+Write-Host "  - Deployment size: ~20-30MB (70-80% reduction)" -ForegroundColor Gray
+Write-Host "  - PDB files: Disabled" -ForegroundColor Gray
+Write-Host "  - ReadyToRun: Disabled" -ForegroundColor Gray
+Write-Host ""
+Write-Host "RUNTIME REQUIREMENTS:" -ForegroundColor Yellow
+Write-Host "  Users must install the following runtimes:" -ForegroundColor Gray
+Write-Host "  1. .NET 9 Desktop Runtime (x64)" -ForegroundColor White
+Write-Host "     Download: https://dotnet.microsoft.com/download/dotnet/9.0" -ForegroundColor Gray
+Write-Host "  2. Windows App SDK 1.8 Runtime" -ForegroundColor White
+Write-Host "     (Automatically installed from Microsoft Store or can be manually deployed)" -ForegroundColor Gray
+Write-Host ""
+Write-Host "See RUNTIME-INSTALL.md for detailed installation instructions." -ForegroundColor Cyan
 Write-Host ""
