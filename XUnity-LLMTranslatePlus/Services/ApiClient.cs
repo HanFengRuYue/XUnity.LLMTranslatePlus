@@ -251,7 +251,7 @@ namespace XUnity_LLMTranslatePlus.Services
                 // 如果还有重试次数，等待一段时间后重试
                 if (retryCount <= config.RetryCount)
                 {
-                    await Task.Delay(2000 * retryCount); // 递增延迟
+                    await Task.Delay(2000 * retryCount, cancellationToken); // 递增延迟，支持取消
                 }
             }
 

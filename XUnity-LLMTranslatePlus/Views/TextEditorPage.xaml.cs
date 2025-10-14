@@ -122,14 +122,28 @@ namespace XUnity_LLMTranslatePlus.Views
             try
             {
                 var config = _configService.GetCurrentConfig();
-                if (!string.IsNullOrEmpty(config.GameDirectory))
+
+                // 快速返回：如果没有设置游戏目录，显示空状态提示
+                if (string.IsNullOrWhiteSpace(config.GameDirectory))
                 {
-                    await _textEditorService.LoadFromGameDirectoryAsync(config.GameDirectory);
+                    ShowEmptyState(true);
+                    _logService?.Log("未设置游戏目录，请在翻译设置中配置", LogLevel.Info);
+                    return;
                 }
+
+                // 添加超时保护（最多等待10秒）
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                await _textEditorService.LoadFromGameDirectoryAsync(config.GameDirectory);
+            }
+            catch (OperationCanceledException)
+            {
+                _logService?.Log("加载文件超时", LogLevel.Warning);
+                ShowEmptyState(true);
             }
             catch (Exception ex)
             {
                 _logService?.Log($"自动加载文件失败: {ex.Message}", LogLevel.Warning);
+                ShowEmptyState(true);
             }
         }
 

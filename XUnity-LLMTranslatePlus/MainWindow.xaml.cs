@@ -80,6 +80,7 @@ namespace XUnity_LLMTranslatePlus
                     "TranslationSettings" => typeof(TranslationSettingsPage),
                     "TextEditor" => typeof(TextEditorPage),
                     "Log" => typeof(LogPage),
+                    "About" => typeof(AboutPage),
                     _ => null
                 };
 

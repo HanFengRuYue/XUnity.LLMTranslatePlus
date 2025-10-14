@@ -210,71 +210,111 @@ namespace XUnity_LLMTranslatePlus.Utils
         }
 
         /// <summary>
-        /// 保存文件
+        /// 保存文件（带重试机制，防止文件冲突）
         /// </summary>
         public async Task SaveFileAsync(string filePath, CancellationToken cancellationToken = default)
         {
             // 验证文件路径
             string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
 
-            try
+            const int maxRetries = 5;
+            int retryCount = 0;
+            Random random = new Random();
+
+            while (retryCount < maxRetries)
             {
-                var outputLines = new List<string>();
-
-                lock (_lockObject)
+                try
                 {
-                    foreach (var line in _fileLines)
+                    var outputLines = new List<string>();
+
+                    lock (_lockObject)
                     {
-                        // 保留空行和注释
-                        if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("//"))
+                        foreach (var line in _fileLines)
                         {
-                            outputLines.Add(line);
-                            continue;
-                        }
-
-                        // 查找键值对
-                        int separatorIndex = line.IndexOf('=');
-                        if (separatorIndex > 0)
-                        {
-                            // 使用 Span<char> 优化
-                            ReadOnlySpan<char> lineSpan = line.AsSpan();
-                            string key = lineSpan.Slice(0, separatorIndex).Trim().ToString();
-
-                            // 如果有更新的翻译，使用新的值
-                            if (_translations.TryGetValue(key, out string? newValue))
+                            // 保留空行和注释
+                            if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("//"))
                             {
-                                // 保持原始格式（是否有引号）
-                                bool hasQuotes = line.Contains("\"");
-                                string newLine = hasQuotes
-                                    ? $"{key}=\"{newValue}\""
-                                    : $"{key}={newValue}";
+                                outputLines.Add(line);
+                                continue;
+                            }
 
-                                outputLines.Add(newLine);
+                            // 查找键值对
+                            int separatorIndex = line.IndexOf('=');
+                            if (separatorIndex > 0)
+                            {
+                                // 使用 Span<char> 优化
+                                ReadOnlySpan<char> lineSpan = line.AsSpan();
+                                string key = lineSpan.Slice(0, separatorIndex).Trim().ToString();
+
+                                // 如果有更新的翻译，使用新的值
+                                if (_translations.TryGetValue(key, out string? newValue))
+                                {
+                                    // 保持原始格式（是否有引号）
+                                    bool hasQuotes = line.Contains("\"");
+                                    string newLine = hasQuotes
+                                        ? $"{key}=\"{newValue}\""
+                                        : $"{key}={newValue}";
+
+                                    outputLines.Add(newLine);
+                                }
+                                else
+                                {
+                                    // 没有更新，保持原样
+                                    outputLines.Add(line);
+                                }
                             }
                             else
                             {
-                                // 没有更新，保持原样
+                                // 不是键值对，保持原样
                                 outputLines.Add(line);
                             }
                         }
-                        else
+                    }
+
+                    // 使用 FileShare.Read 允许其他进程同时读取
+                    await using (var fileStream = new FileStream(
+                        validatedPath,
+                        FileMode.Create,
+                        FileAccess.Write,
+                        FileShare.Read,
+                        4096,
+                        FileOptions.Asynchronous))
+                    {
+                        await using (var writer = new StreamWriter(fileStream, Encoding.UTF8))
                         {
-                            // 不是键值对，保持原样
-                            outputLines.Add(line);
+                            foreach (var line in outputLines)
+                            {
+                                await writer.WriteLineAsync(line);
+                            }
                         }
                     }
-                }
 
-                await File.WriteAllLinesAsync(validatedPath, outputLines, Encoding.UTF8, cancellationToken);
+                    // 写入成功，退出重试循环
+                    return;
+                }
+                catch (IOException) when (retryCount < maxRetries - 1)
+                {
+                    // 文件被占用，等待后重试
+                    retryCount++;
+                    int delayMs = random.Next(200, 1000); // 随机延迟 200-1000ms
+                    await Task.Delay(delayMs, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    throw new FileOperationException(
+                        $"保存文件失败: {ex.Message}",
+                        ex,
+                        filePath,
+                        "Save");
+                }
             }
-            catch (Exception ex)
-            {
-                throw new FileOperationException(
-                    $"保存文件失败: {ex.Message}",
-                    ex,
-                    filePath,
-                    "Save");
-            }
+
+            // 重试次数用尽
+            throw new FileOperationException(
+                $"保存文件失败: 文件被占用，已重试 {maxRetries} 次",
+                null,
+                filePath,
+                "Save");
         }
 
         /// <summary>

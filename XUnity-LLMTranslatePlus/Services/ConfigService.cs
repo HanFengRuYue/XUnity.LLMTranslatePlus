@@ -68,9 +68,8 @@ namespace XUnity_LLMTranslatePlus.Services
                             {
                                 config.ApiKey = SecureDataProtection.Unprotect(config.ApiKey);
                             }
-                            catch (Exception ex)
+                            catch
                             {
-                                Console.WriteLine($"解密 API Key 失败: {ex.Message}");
                                 // 如果解密失败，可能是旧格式的明文，保持原样
                             }
                         }
@@ -85,13 +84,20 @@ namespace XUnity_LLMTranslatePlus.Services
                 {
                     // 首次启动，创建默认配置
                     _currentConfig = new AppConfig();
-                    await SaveConfigAsync(_currentConfig);
+                    // 注意：这里已经持有锁，不能调用SaveConfigAsync（会死锁）
+                    // 直接在这里保存文件
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                    };
+                    string json = JsonSerializer.Serialize(_currentConfig, options);
+                    await File.WriteAllTextAsync(ConfigFilePath, json, cancellationToken);
                 }
             }
-            catch (Exception ex)
+            catch
             {
                 // 配置文件损坏，使用默认配置
-                Console.WriteLine($"加载配置失败: {ex.Message}");
                 _currentConfig = new AppConfig();
             }
             finally
@@ -152,9 +158,9 @@ namespace XUnity_LLMTranslatePlus.Services
                 throw new ConfigurationValidationException($"重试次数必须在0到10之间，当前值: {config.RetryCount}", nameof(config.RetryCount));
             }
 
-            if (config.MaxConcurrentTranslations <= 0 || config.MaxConcurrentTranslations > 20)
+            if (config.MaxConcurrentTranslations <= 0 || config.MaxConcurrentTranslations > 100)
             {
-                throw new ConfigurationValidationException($"最大并发数必须在1到20之间，当前值: {config.MaxConcurrentTranslations}", nameof(config.MaxConcurrentTranslations));
+                throw new ConfigurationValidationException($"最大并发数必须在1到100之间，当前值: {config.MaxConcurrentTranslations}", nameof(config.MaxConcurrentTranslations));
             }
 
             if (string.IsNullOrWhiteSpace(config.SystemPrompt))
@@ -205,11 +211,11 @@ namespace XUnity_LLMTranslatePlus.Services
                     TermsFilePath = config.TermsFilePath,
                     GameDirectory = config.GameDirectory,
                     AutoDetectPath = config.AutoDetectPath,
+                    ManualTranslationFilePath = config.ManualTranslationFilePath,
                     TargetLanguage = config.TargetLanguage,
                     SourceLanguage = config.SourceLanguage,
                     PreserveSpecialChars = config.PreserveSpecialChars,
                     RealTimeMonitoring = config.RealTimeMonitoring,
-                    MonitorInterval = config.MonitorInterval,
                     EnableContext = config.EnableContext,
                     ContextLines = config.ContextLines,
                     ContextWeight = config.ContextWeight,
@@ -229,9 +235,8 @@ namespace XUnity_LLMTranslatePlus.Services
                             configToSave.ApiKey = SecureDataProtection.Protect(configToSave.ApiKey);
                         }
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        Console.WriteLine($"加密 API Key 失败: {ex.Message}");
                         // 加密失败，保存明文（向后兼容）
                     }
                 }

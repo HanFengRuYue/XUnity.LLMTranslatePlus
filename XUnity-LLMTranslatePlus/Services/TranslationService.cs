@@ -18,8 +18,20 @@ namespace XUnity_LLMTranslatePlus.Services
         private readonly LogService _logService;
         private readonly ConfigService _configService;
 
-        // 统计信息
-        public int TotalTranslated { get; private set; }
+        // 统计信息 - 使用 HashSet 追踪已翻译的唯一文本，避免重复计数
+        private readonly HashSet<string> _translatedTexts = new HashSet<string>();
+        private readonly object _statsLock = new object();
+
+        public int TotalTranslated
+        {
+            get
+            {
+                lock (_statsLock)
+                {
+                    return _translatedTexts.Count;
+                }
+            }
+        }
         public int TotalFailed { get; private set; }
         public int TotalSkipped { get; private set; }
 
@@ -134,7 +146,12 @@ namespace XUnity_LLMTranslatePlus.Services
                 // 8. 添加到上下文缓存
                 AddToContext(originalText, translatedText);
 
-                TotalTranslated++;
+                // 记录到已翻译集合（去重统计）
+                lock (_statsLock)
+                {
+                    _translatedTexts.Add(originalText);
+                }
+                NotifyProgress();
 
                 await _logService.LogAsync($"翻译完成: {translatedText}", LogLevel.Debug);
 
@@ -142,7 +159,11 @@ namespace XUnity_LLMTranslatePlus.Services
             }
             catch (Exception ex)
             {
-                TotalFailed++;
+                lock (_statsLock)
+                {
+                    TotalFailed++;
+                }
+                NotifyProgress();
 
                 await _logService.LogAsync($"翻译失败: {originalText} - {ex.Message}", LogLevel.Error);
                 throw;
@@ -269,9 +290,12 @@ namespace XUnity_LLMTranslatePlus.Services
         /// </summary>
         public void ResetStatistics()
         {
-            TotalTranslated = 0;
-            TotalFailed = 0;
-            TotalSkipped = 0;
+            lock (_statsLock)
+            {
+                _translatedTexts.Clear();
+                TotalFailed = 0;
+                TotalSkipped = 0;
+            }
             lock (_translatingLock)
             {
                 _translatingCount = 0;

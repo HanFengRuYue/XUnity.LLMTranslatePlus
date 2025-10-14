@@ -15,7 +15,7 @@ namespace XUnity_LLMTranslatePlus.Models
         public string ModelName { get; set; } = "gpt-3.5-turbo";
 
         // API 高级配置
-        public int MaxTokens { get; set; } = 2000;
+        public int MaxTokens { get; set; } = 4096;
         public double Temperature { get; set; } = 0.7;
         public double TopP { get; set; } = 1.0;
         public double FrequencyPenalty { get; set; } = 0.0;
@@ -36,11 +36,11 @@ namespace XUnity_LLMTranslatePlus.Models
         // 翻译设置
         public string GameDirectory { get; set; } = "";
         public bool AutoDetectPath { get; set; } = true;
+        public string ManualTranslationFilePath { get; set; } = ""; // 手动指定的翻译文件路径
         public string TargetLanguage { get; set; } = "简体中文";
         public string SourceLanguage { get; set; } = "自动检测";
         public bool PreserveSpecialChars { get; set; } = true;
         public bool RealTimeMonitoring { get; set; } = true;
-        public int MonitorInterval { get; set; } = 500;
 
         // 上下文配置
         public bool EnableContext { get; set; } = false;

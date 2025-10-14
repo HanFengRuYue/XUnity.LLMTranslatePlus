@@ -101,7 +101,7 @@
                     <StackPanel Spacing="4">
                         <TextBlock Text="最大令牌数"/>
                         <NumberBox x:Name="MaxTokensNumberBox"
-                                   Value="2000"
+                                   Value="4096"
                                    Minimum="1"
                                    Maximum="32000"
                                    SpinButtonPlacementMode="Inline"

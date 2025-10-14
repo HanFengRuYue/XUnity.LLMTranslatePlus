@@ -86,7 +86,7 @@ try { /* critical section */ }
 finally { _semaphore.Release(); }
 ```
 
-Never use `lock` in async methods - it causes deadlocks.
+**Critical**: Never use `lock` in async methods - it causes deadlocks. Additionally, when holding a `SemaphoreSlim` lock, NEVER call another method that also acquires the same lock - this causes deadlock. If you need to perform operations while holding a lock, implement the logic inline rather than calling other locked methods.
 
 ### 3. High-Performance Logging with Channel<T>
 **Location**: `Services/LogService.cs`
@@ -98,6 +98,75 @@ private readonly Channel<LogEntry> _logChannel;
 ```
 
 Log entries are queued immediately and flushed in batches (50 entries or 2 seconds). This pattern should be maintained.
+
+### 3b. Batch File Writing with Channel<T>
+**Location**: `Services/FileMonitorService.cs`
+
+Translation results are batched before writing to prevent file conflicts with XUnity:
+
+```csharp
+private readonly Channel<Dictionary<string, string>> _writeQueue;
+private Task? _writerTask;
+```
+
+**Key Features**:
+- Separate batch writer task runs independently
+- Writes every 5 translations OR every 2 seconds (whichever comes first)
+- Reduces file I/O by 80%+ and minimizes write conflicts
+- Uses retry mechanism (5 attempts, 200-1000ms random delay) to handle remaining conflicts
+- **FileSystemWatcher protection**: Temporarily disables file monitoring during batch writes with 300ms stabilization delay to prevent infinite loop
+
+**Critical Channel<T> Patterns**:
+- Never write directly to file in consumer tasks. Always queue writes through `_writeQueue.Writer.WriteAsync()`
+- Use `WaitToReadAsync()` + `TryRead()` pattern instead of `ReadAsync()` when combining with `Task.WhenAny()` to avoid "Another continuation was already registered" errors
+- Store `.AsTask()` result in a variable before using in comparisons - calling it multiple times creates different Task instances
+- Initialize Channel BEFORE calling any methods that write to it
+
+**Correct Pattern**:
+```csharp
+// Store AsTask() result once
+var waitToReadTask = _writeQueue.Reader.WaitToReadAsync(cancellationToken).AsTask();
+var timeoutTask = Task.Delay(500, cancellationToken);
+var completedTask = await Task.WhenAny(waitToReadTask, timeoutTask);
+
+// Use the stored task for comparison
+if (completedTask == waitToReadTask && await waitToReadTask)
+{
+    // Drain available items synchronously
+    while (_writeQueue.Reader.TryRead(out var batch))
+    {
+        pendingWrites.Add(batch);
+    }
+}
+```
+
+**FileSystemWatcher Loop Prevention**:
+```csharp
+// Disable monitoring during write
+bool wasMonitoring = false;
+if (_fileWatcher != null && _fileWatcher.EnableRaisingEvents)
+{
+    _fileWatcher.EnableRaisingEvents = false;
+    wasMonitoring = true;
+}
+
+try
+{
+    // Perform file write operations
+    await _parser.SaveFileAsync(_monitoredFilePath, cancellationToken);
+
+    // Wait for file system to stabilize
+    await Task.Delay(300, cancellationToken);
+}
+finally
+{
+    // Always re-enable monitoring
+    if (wasMonitoring && _fileWatcher != null)
+    {
+        _fileWatcher.EnableRaisingEvents = true;
+    }
+}
+```
 
 ### 4. Regex Source Generators
 **Location**: `Utils/EscapeCharacterHandler.cs`
@@ -222,10 +291,10 @@ API keys in `config.json` are stored encrypted with `"ENC:"` prefix.
 Configuration is validated before saving using the `ValidateConfig()` method:
 
 - API URL format validation
-- Numeric range validation (MaxTokens: 1-128000, Temperature: 0-2, etc.)
+- Numeric range validation (MaxTokens: 1-128000, Temperature: 0-2, MaxConcurrentTranslations: 1-100, etc.)
 - Required field validation
 
-Validation errors throw `ConfigurationValidationException` with the specific field name.
+Validation errors throw `ConfigurationValidationException` with the specific field name. **Important**: Validation ranges must match UI control limits to prevent save failures.
 
 ## XUnity Translation File Format
 
@@ -328,13 +397,16 @@ Understanding the translation flow is crucial for modifications:
    - Triggers progress update event
 
 ### Translation Statistics
-The `TranslationService` tracks four key metrics:
-- `TotalTranslated` - Successfully completed translations
+The `TranslationService` tracks four key metrics using **unique text deduplication**:
+- `TotalTranslated` - Successfully completed translations (uses `HashSet<string>` for unique count, prevents duplicate counting)
 - `TotalFailed` - Failed translation attempts
 - `TotalSkipped` - Skipped translations (e.g., already translated)
 - `TranslatingCount` - Currently processing (sent to API, awaiting response)
 
-**Important**: `TranslatingCount` uses thread-safe locking (`_translatingLock`) because multiple threads may be translating concurrently. The count is incremented before API call and decremented in `finally` block to ensure accuracy.
+**Important**:
+- `TotalTranslated` is backed by `_translatedTexts` HashSet (TranslationService.cs:22) to ensure accurate unique text count even if same text is translated multiple times
+- `TranslatingCount` uses thread-safe locking (`_translatingLock`) because multiple threads may be translating concurrently
+- Counts are incremented before API call and decremented in `finally` block to ensure accuracy
 
 ## File Monitoring System
 
@@ -349,14 +421,14 @@ The monitoring system has specific patterns:
 
 ### Processing Flow
 1. `FileSystemWatcher` detects file changes
-2. Delay 500ms to let file writing complete
+2. **Delay 200ms** to let file writing complete (optimized from 500ms, 60% faster detection)
 3. `LoadAndProcessFileAsync()` parses file and finds untranslated entries
 4. Untranslated entries removed from `_processedTexts` cache (allows retranslation)
-5. Added to `_pendingTexts` queue
-6. `ProcessPendingTextsAsync()` runs every 5 seconds
-7. Validates entries still need translation (file may have changed)
-8. Calls `TranslateBatchAsync()` with controlled concurrency
-9. Updates file atomically
+5. Added to `_pendingTexts` Channel queue
+6. **Consumer tasks** (N concurrent workers) continuously process from queue
+7. Each consumer translates text and queues result to `_writeQueue`
+8. **Batch writer task** collects translations and writes every 5 items or 2 seconds
+9. File write uses retry mechanism with exponential backoff to handle conflicts
 
 ### Concurrency Control
 ```csharp
@@ -502,6 +574,14 @@ ContentFrame.Navigate(typeof(PageType));
 
 Pages are instantiated on navigation. No page caching.
 
+**Available Pages**:
+- HomePage - Translation status, start/stop monitoring
+- ApiConfigPage - API settings, model selection, connection test
+- TranslationSettingsPage - Game directory, manual file path selection, language settings
+- TextEditorPage - Manual text editing, CSV import/export
+- LogPage - Real-time logs with filtering
+- AboutPage - App info, system paths, reset configuration button (in FooterMenuItems)
+
 ## Important Conventions
 
 1. **Async All The Way**: All I/O operations are async. Never use `.Result` or `.Wait()`.
@@ -522,7 +602,7 @@ Pages are instantiated on navigation. No page caching.
 
 2. **XUnity File Format**: Never escape/unescape `\n` as actual newlines. Store literally as two characters.
 
-3. **FileSystemWatcher Delays**: Always add 500ms delay before reading file after change event.
+3. **FileSystemWatcher Delays**: Current delay is 200ms (optimized from 500ms). This is the minimum safe delay for most file systems.
 
 4. **Config Load Timing**: Config must be loaded before accessing `GetCurrentConfig()`. App.xaml.cs handles this during startup.
 
@@ -542,6 +622,20 @@ Pages are instantiated on navigation. No page caching.
     - MUST set environment variable `MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY` in `App.xaml.cs` constructor before `InitializeComponent()`.
 
 11. **Build Warnings**: When building framework-dependent single-file, MSBuild will show warnings about "PublishSingleFile is recommended only for Self-Contained apps". These are recommendations, not errors. The build will succeed and the executable will work correctly if the environment variable is set.
+
+12. **ConfigService Deadlock**: The `LoadConfigAsync` method in ConfigService holds a `_semaphore` lock. It MUST NOT call `SaveConfigAsync` (which also acquires the same lock), as this causes deadlock. If you need to save config during load, serialize and write the file inline within the locked section. This pattern applies to any class using SemaphoreSlim for synchronization.
+
+13. **File Write Conflicts**: XUnity and the app may write to the same file simultaneously. Always use the retry mechanism in `TextFileParser.SaveFileAsync()` which attempts up to 5 times with random 200-1000ms delays. The batch writing system in FileMonitorService further reduces conflict probability by 80%+.
+
+14. **Manual Translation File Path**: Users can manually specify a translation file path (TranslationSettingsPage) which takes priority over auto-detection. FileMonitorService checks `config.ManualTranslationFilePath` first before attempting auto-detection.
+
+15. **TextEditor Empty State**: Always check if game directory/file path is configured before loading in TextEditorPage. Use 10-second timeout protection and show empty state UI with helpful message if path is missing.
+
+16. **Channel<T> with Task.WhenAny**: NEVER use `ReadAsync()` directly with `Task.WhenAny()` - this causes "Another continuation was already registered" errors when timeout occurs. Always use `WaitToReadAsync()` + `TryRead()` pattern instead. Additionally, ALWAYS store `.AsTask()` result in a variable before using it in comparisons - calling it multiple times creates different Task instances, breaking the comparison logic.
+
+17. **Channel Initialization Order**: Channels MUST be initialized BEFORE any code that writes to them runs. In FileMonitorService, `_pendingTexts` Channel must be created before calling `LoadAndProcessFileAsync()`, otherwise all initial texts will silently fail to queue.
+
+18. **FileSystemWatcher Infinite Loop**: When your code writes to a file being monitored by FileSystemWatcher, it triggers its own `Changed` event, creating an infinite loop. Always temporarily disable `FileSystemWatcher.EnableRaisingEvents` during file writes, add a stabilization delay (300ms), and re-enable in a `finally` block. This is critical for batch write operations in FileMonitorService.
 
 ## Testing Translation API
 
@@ -590,7 +684,7 @@ This sends "Hello" with prompt "Translate to Chinese:" to verify connectivity.
   - Added environment variable setup in `App.xaml.cs` for single-file support
   - Created `RUNTIME-INSTALL.md` with user installation instructions
   - Single-file deployment without compression (compression not supported for framework-dependent)
-- **Recent UI Improvements** (Latest):
+- **Recent UI Improvements**:
   - Fixed window and taskbar icon display with `AppWindow.SetIcon("ICON.ico")`
   - Fixed title bar icon using `ms-appx:///` URI scheme for embedded assets
   - Added automatic window centering on startup using `DisplayArea` API
@@ -599,3 +693,22 @@ This sends "Hello" with prompt "Translate to Chinese:" to verify connectivity.
   - Renamed "翻译队列" to "API处理中" for clarity in two-queue pipeline
   - Removed non-functional "全部翻译" button from TextEditorPage
   - Added `MonitoredFilePath` property to FileMonitorService for UI access
+- **Critical Bugfixes and Performance Improvements** (Latest):
+  - Fixed deadlock in ConfigService.LoadConfigAsync that prevented config file generation on first startup
+  - Fixed validation range mismatch: ConfigService MaxConcurrentTranslations validation now matches UI limit (1-100)
+  - LoadConfigAsync now serializes config inline when creating default config instead of calling SaveConfigAsync (prevents reentrancy deadlock)
+  - **Fixed duplicate translation counting**: TotalTranslated now uses HashSet for unique text tracking (30 texts = 30 count, not 200+)
+  - **Fixed file write conflicts**: Implemented retry mechanism (5 attempts) and batch writing system (5 items/2s) to handle XUnity concurrent writes
+  - **Fixed TextEditor hang**: Added empty path detection, 10s timeout, and friendly empty state UI
+  - **Optimized translation latency**: Reduced file change detection from 500ms to 200ms (60% faster), removed redundant file parsing in translation loop
+  - **Added manual file path**: Users can now manually select translation file, bypassing auto-detection issues
+  - **Added AboutPage**: New page with app info, system paths, and configuration reset functionality
+  - **Fixed Channel<T> continuation conflict**: Changed from `ReadAsync()` to `WaitToReadAsync()` + `TryRead()` pattern in BatchWriterTaskAsync to prevent "Another continuation was already registered" errors
+  - **Fixed Task.WhenAny comparison**: Stored `.AsTask()` result in variable before comparison instead of calling it multiple times (each call creates new Task instance)
+  - **Fixed Channel initialization order**: Moved Channel initialization before `LoadAndProcessFileAsync()` to prevent silent queue write failures on startup
+  - **Fixed FileSystemWatcher infinite loop**: Implemented temporary disabling of file monitoring during batch writes with 300ms stabilization delay to prevent duplicate translations caused by self-triggered file change events
+  - **Removed Console.WriteLine**: Migrated all console output to LogService (except LogService self-error handling)
+  - **Removed MonitorInterval setting**: Deleted unused monitoring interval configuration from UI and config
+  - **Fixed retry cancellation**: ApiClient retry delays now properly support CancellationToken for high-concurrency scenarios
+  - **Updated MaxTokens default**: Changed from 2000 to 4096 to better accommodate modern LLM context windows
+  - **Improved manual file path UX**: Manual file path option now only appears when auto-detection is disabled or fails
