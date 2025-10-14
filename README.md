@@ -148,7 +148,3 @@ MIT License
 - [XUnity.AutoTranslator](https://github.com/bbepis/XUnity.AutoTranslator) - Unity游戏自动翻译框架
 
 ---
-
-<div align="center">
-Made with ❤️ for game translation
-</div>
