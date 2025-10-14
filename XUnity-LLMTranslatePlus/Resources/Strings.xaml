@@ -83,8 +83,7 @@
     <x:String x:Key="TranslationContextConfig">上下文配置</x:String>
     <x:String x:Key="TranslationEnableContext">启用上下文参考</x:String>
     <x:String x:Key="TranslationContextLines">上下文行数</x:String>
-    <x:String x:Key="TranslationContextWeight">上下文权重</x:String>
-    
+
     <x:String x:Key="TranslationOutputConfig">输出配置</x:String>
     <x:String x:Key="TranslationSaveBackup">保存原文备份</x:String>
     <x:String x:Key="TranslationEnableCache">翻译缓存</x:String>

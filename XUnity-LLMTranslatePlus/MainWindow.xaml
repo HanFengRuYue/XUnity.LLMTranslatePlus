@@ -56,19 +56,25 @@
                         <FontIcon Glyph="&#xE713;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                
+
                 <NavigationViewItem Content="翻译设置" Tag="TranslationSettings">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE774;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                
+
+                <NavigationViewItem Content="术语库" Tag="Terminology">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8F1;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
                 <NavigationViewItem Content="文本编辑器" Tag="TextEditor">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE70F;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                
+
                 <NavigationViewItem Content="日志监控" Tag="Log">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE7BA;"/>

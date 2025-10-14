@@ -177,6 +177,11 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 throw new ConfigurationValidationException($"错误阈值必须在1到1000之间，当前值: {config.ErrorThreshold}", nameof(config.ErrorThreshold));
             }
+
+            if (config.ContextLines < 1)
+            {
+                throw new ConfigurationValidationException($"上下文行数必须大于0，当前值: {config.ContextLines}", nameof(config.ContextLines));
+            }
         }
 
         /// <summary>
@@ -218,7 +223,6 @@ namespace XUnity_LLMTranslatePlus.Services
                     RealTimeMonitoring = config.RealTimeMonitoring,
                     EnableContext = config.EnableContext,
                     ContextLines = config.ContextLines,
-                    ContextWeight = config.ContextWeight,
                     EnableCache = config.EnableCache,
                     ExportLog = config.ExportLog,
                     ErrorThreshold = config.ErrorThreshold

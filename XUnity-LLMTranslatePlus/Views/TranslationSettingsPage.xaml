@@ -136,24 +136,24 @@
             <Expander Header="上下文配置" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                 <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
                         <!-- 启用上下文参考 -->
-                        <ToggleSwitch x:Name="EnableContextToggle" 
+                        <ToggleSwitch x:Name="EnableContextToggle"
                                       Header="启用上下文参考"
-                                      IsOn="False"
-                                      OnContent="已启用" 
+                                      IsOn="True"
+                                      OnContent="已启用"
                                       OffContent="已禁用"
                                       Toggled="EnableContextToggle_Toggled"/>
 
                         <!-- 上下文配置面板 -->
-                        <StackPanel x:Name="ContextConfigPanel" 
-                                    Spacing="12" 
-                                    Visibility="Collapsed">
+                        <StackPanel x:Name="ContextConfigPanel"
+                                    Spacing="12"
+                                    Visibility="Visible">
                             <!-- 上下文行数 -->
                             <StackPanel Spacing="4">
-                                <TextBlock Text="上下文行数（前后各 N 行）"/>
+                                <TextBlock Text="上下文记录数量"/>
                                 <NumberBox x:Name="ContextLinesNumberBox"
-                                           Value="3"
+                                           Value="10"
                                            Minimum="1"
-                                           Maximum="10"
+                                           Maximum="100"
                                            SpinButtonPlacementMode="Inline"
                                            ValueChanged="ContextLinesNumberBox_ValueChanged"/>
                             </StackPanel>
@@ -175,10 +175,37 @@
                                       OnContent="已启用"
                                       OffContent="已禁用"
                                       Toggled="EnableCacheToggle_Toggled"/>
-                        
-                    <CheckBox x:Name="ExportLogCheckBox" 
-                              Content="导出翻译日志（记录所有翻译操作）" 
+
+                    <CheckBox x:Name="ExportLogCheckBox"
+                              Content="导出翻译日志（记录所有翻译操作）"
                               IsChecked="False"/>
+                </StackPanel>
+            </Expander>
+
+            <!-- 系统提示词 -->
+            <Expander Header="系统提示词" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
+                    <!-- 提示词变量说明 -->
+                    <InfoBar Severity="Informational"
+                             IsOpen="True"
+                             IsClosable="False"
+                             Message="可用变量：{目标语言}、{原文}、{术语}、{上下文}"/>
+
+                    <!-- 提示词模板 -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="提示词模板"/>
+                        <TextBox x:Name="SystemPromptTextBox"
+                                 AcceptsReturn="True"
+                                 TextWrapping="Wrap"
+                                 Height="180"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 HorizontalAlignment="Stretch"
+                                 Text="你是一个专业的游戏文本翻译助手。请将以下文本翻译成{目标语言}。保持原文的语气和风格，确保翻译准确、流畅、自然。&#xA;&#xA;【重要】如果文本中包含形如【SPECIAL_数字】的占位符，请务必在译文中完整保留这些占位符，不要翻译或修改它们。&#xA;&#xA;原文：{原文}&#xA;&#xA;术语参考：{术语}&#xA;&#xA;上下文参考：{上下文}&#xA;&#xA;请只输出翻译结果，不要包含任何解释或额外内容。"
+                                 TextChanged="SystemPromptTextBox_TextChanged"/>
+                    </StackPanel>
+
+                    <!-- 重置按钮 -->
+                    <Button Content="重置为默认" Click="ResetPromptButton_Click"/>
                 </StackPanel>
             </Expander>
 

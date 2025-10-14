@@ -32,6 +32,8 @@ namespace XUnity_LLMTranslatePlus.Models
         // 术语库
         public List<Term> TermsDatabase { get; set; } = new List<Term>();
         public string TermsFilePath { get; set; } = "";
+        public string CurrentTerminologyFile { get; set; } = "default";
+        public bool EnableSmartTerminology { get; set; } = false;
 
         // 翻译设置
         public string GameDirectory { get; set; } = "";
@@ -43,9 +45,8 @@ namespace XUnity_LLMTranslatePlus.Models
         public bool RealTimeMonitoring { get; set; } = true;
 
         // 上下文配置
-        public bool EnableContext { get; set; } = false;
-        public int ContextLines { get; set; } = 3;
-        public double ContextWeight { get; set; } = 0.5;
+        public bool EnableContext { get; set; } = true;
+        public int ContextLines { get; set; } = 10;
 
         // 输出配置
         public bool EnableCache { get; set; } = true;

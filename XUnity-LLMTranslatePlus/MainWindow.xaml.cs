@@ -78,6 +78,7 @@ namespace XUnity_LLMTranslatePlus
                     "Home" => typeof(HomePage),
                     "ApiConfig" => typeof(ApiConfigPage),
                     "TranslationSettings" => typeof(TranslationSettingsPage),
+                    "Terminology" => typeof(TerminologyPage),
                     "TextEditor" => typeof(TextEditorPage),
                     "Log" => typeof(LogPage),
                     "About" => typeof(AboutPage),

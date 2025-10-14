@@ -42,6 +42,7 @@ namespace XUnity_LLMTranslatePlus
             services.AddSingleton<ConfigService>();
             services.AddSingleton<TerminologyService>();
             services.AddSingleton<ApiClient>();
+            services.AddSingleton<SmartTerminologyService>();
             services.AddSingleton<TranslationService>();
             services.AddSingleton<FileMonitorService>();
             services.AddSingleton<TextEditorService>();

@@ -43,7 +43,6 @@
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}">
                         <Run Text="• .NET 9.0 + WinUI 3"/><LineBreak/>
                         <Run Text="• Windows App SDK 1.8"/><LineBreak/>
-                        <Run Text="• System.Threading.Channels 高性能并发"/>
                     </TextBlock>
                 </StackPanel>
 
@@ -51,11 +50,9 @@
                 <StackPanel Spacing="8">
                     <TextBlock Text="相关链接" FontWeight="SemiBold"/>
                     <HyperlinkButton Content="GitHub 仓库"
-                                     NavigateUri="https://github.com/yourusername/XUnity-LLMTranslatePlus"/>
+                                     NavigateUri="https://github.com/HanFengRuYue/XUnity.LLMTranslatePlus"/>
                     <HyperlinkButton Content="问题反馈"
-                                     NavigateUri="https://github.com/yourusername/XUnity-LLMTranslatePlus/issues"/>
-                    <HyperlinkButton Content="XUnity.AutoTranslator"
-                                     NavigateUri="https://github.com/bbepis/XUnity.AutoTranslator"/>
+                                     NavigateUri="https://github.com/HanFengRuYue/XUnity.LLMTranslatePlus/issues"/>
                 </StackPanel>
 
                 <!-- 开源协议 -->
@@ -63,7 +60,6 @@
                     <TextBlock Text="开源协议" FontWeight="SemiBold"/>
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}">
                         <Run Text="本软件基于 MIT License 开源"/><LineBreak/>
-                        <Run Text="© 2025 XUnity大语言模型翻译Plus. All rights reserved."/>
                     </TextBlock>
                 </StackPanel>
             </StackPanel>
@@ -116,7 +112,7 @@
                         BorderThickness="1"
                         CornerRadius="8"
                         Padding="24">
-                <TextBlock Text="危险区域"
+                <TextBlock Text="警告"
                            FontWeight="SemiBold"
                            Style="{StaticResource SubtitleTextBlockStyle}"
                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>

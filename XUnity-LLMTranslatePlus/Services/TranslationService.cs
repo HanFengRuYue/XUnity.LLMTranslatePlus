@@ -17,6 +17,7 @@ namespace XUnity_LLMTranslatePlus.Services
         private readonly TerminologyService _terminologyService;
         private readonly LogService _logService;
         private readonly ConfigService _configService;
+        private readonly SmartTerminologyService? _smartTerminologyService;
 
         // 统计信息 - 使用 HashSet 追踪已翻译的唯一文本，避免重复计数
         private readonly HashSet<string> _translatedTexts = new HashSet<string>();
@@ -49,9 +50,9 @@ namespace XUnity_LLMTranslatePlus.Services
             }
         }
 
-        // 上下文缓存
+        // 上下文缓存及其锁
         private readonly List<string> _contextCache = new List<string>();
-        private const int MaxContextLines = 10;
+        private readonly object _contextLock = new object();
 
         public event EventHandler<TranslationProgressEventArgs>? ProgressUpdated;
 
@@ -59,12 +60,14 @@ namespace XUnity_LLMTranslatePlus.Services
             ApiClient apiClient,
             TerminologyService terminologyService,
             LogService logService,
-            ConfigService configService)
+            ConfigService configService,
+            SmartTerminologyService? smartTerminologyService = null)
         {
             _apiClient = apiClient;
             _terminologyService = terminologyService;
             _logService = logService;
             _configService = configService;
+            _smartTerminologyService = smartTerminologyService;
         }
 
         /// <summary>
@@ -114,7 +117,7 @@ namespace XUnity_LLMTranslatePlus.Services
                 string termsReference = _terminologyService.BuildTermsReference(textToTranslate);
 
                 // 3. 构建上下文参考
-                string contextReference = BuildContextReference();
+                string contextReference = BuildContextReference(config);
 
                 // 4. 构建系统提示词
                 string systemPrompt = BuildSystemPrompt(
@@ -144,7 +147,29 @@ namespace XUnity_LLMTranslatePlus.Services
                 }
 
                 // 8. 添加到上下文缓存
-                AddToContext(originalText, translatedText);
+                AddToContext(originalText, translatedText, config);
+
+                // 9. 智能术语提取（异步，不阻塞翻译流程）
+                if (_smartTerminologyService != null && config.EnableSmartTerminology)
+                {
+                    // 使用 Task.Run 在后台执行，不等待结果
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await _smartTerminologyService.ExtractAndAddTermsAsync(
+                                originalText,
+                                translatedText,
+                                config,
+                                cancellationToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            // 智能提取失败不影响翻译，只记录日志
+                            await _logService.LogAsync($"[智能术语] 后台提取失败: {ex.Message}", LogLevel.Warning);
+                        }
+                    }, cancellationToken);
+                }
 
                 // 记录到已翻译集合（去重统计）
                 lock (_statsLock)
@@ -249,40 +274,55 @@ namespace XUnity_LLMTranslatePlus.Services
         }
 
         /// <summary>
-        /// 构建上下文参考
+        /// 构建上下文参考（线程安全）
         /// </summary>
-        private string BuildContextReference()
+        private string BuildContextReference(AppConfig config)
         {
-            if (_contextCache.Count == 0)
+            // 检查是否启用上下文功能
+            if (!config.EnableContext)
             {
                 return "无";
             }
 
-            return string.Join("\n", _contextCache.TakeLast(3));
-        }
-
-        /// <summary>
-        /// 添加到上下文缓存
-        /// </summary>
-        private void AddToContext(string original, string translated)
-        {
-            string contextLine = $"{original} -> {translated}";
-            
-            _contextCache.Add(contextLine);
-
-            // 保持缓存大小
-            while (_contextCache.Count > MaxContextLines)
+            lock (_contextLock)
             {
-                _contextCache.RemoveAt(0);
+                if (_contextCache.Count == 0)
+                {
+                    return "无";
+                }
+
+                // 在锁内创建副本避免迭代异常
+                return string.Join("\n", _contextCache.TakeLast(config.ContextLines));
             }
         }
 
         /// <summary>
-        /// 清空上下文缓存
+        /// 添加到上下文缓存（线程安全）
+        /// </summary>
+        private void AddToContext(string original, string translated, AppConfig config)
+        {
+            lock (_contextLock)
+            {
+                string contextLine = $"{original} -> {translated}";
+                _contextCache.Add(contextLine);
+
+                // 使用配置的值保持缓存大小
+                while (_contextCache.Count > config.ContextLines)
+                {
+                    _contextCache.RemoveAt(0);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 清空上下文缓存（线程安全）
         /// </summary>
         public void ClearContext()
         {
-            _contextCache.Clear();
+            lock (_contextLock)
+            {
+                _contextCache.Clear();
+            }
         }
 
         /// <summary>

@@ -1,9 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Linq;
-using Windows.Storage;
-using Windows.Storage.Pickers;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using XUnity_LLMTranslatePlus.Models;
@@ -17,10 +13,7 @@ namespace XUnity_LLMTranslatePlus.Views
     /// </summary>
     public sealed partial class ApiConfigPage : Page
     {
-        public ObservableCollection<Term> Terms { get; set; }
-
         private readonly ConfigService? _configService;
-        private readonly TerminologyService? _terminologyService;
         private readonly ApiClient? _apiClient;
         private readonly LogService? _logService;
         private AppConfig? _currentConfig;
@@ -44,12 +37,9 @@ namespace XUnity_LLMTranslatePlus.Views
         public ApiConfigPage()
         {
             this.InitializeComponent();
-            Terms = new ObservableCollection<Term>();
-            TermsListView.ItemsSource = Terms;
 
             // 获取服务
             _configService = App.GetService<ConfigService>();
-            _terminologyService = App.GetService<TerminologyService>();
             _apiClient = App.GetService<ApiClient>();
             _logService = App.GetService<LogService>();
 
@@ -62,7 +52,7 @@ namespace XUnity_LLMTranslatePlus.Views
                 _ = AutoSaveConfigAsync();
             };
 
-            // 加载配置和术语
+            // 加载配置
             LoadConfiguration();
 
             // 添加Loaded事件确保模型名称正确显示
@@ -91,17 +81,6 @@ namespace XUnity_LLMTranslatePlus.Views
                 {
                     _currentConfig = await _configService.LoadConfigAsync();
                     ApplyConfigToUI(_currentConfig);
-                }
-
-                if (_terminologyService != null)
-                {
-                    await _terminologyService.LoadTermsAsync();
-                    var terms = _terminologyService.GetTerms();
-                    Terms.Clear();
-                    foreach (var term in terms)
-                    {
-                        Terms.Add(term);
-                    }
                 }
             }
             catch (Exception ex)
@@ -154,9 +133,6 @@ namespace XUnity_LLMTranslatePlus.Views
 
             // 并发配置
             MaxConcurrentTranslationsNumberBox.Value = config.MaxConcurrentTranslations;
-
-            // 系统提示词
-            SystemPromptTextBox.Text = config.SystemPrompt;
         }
 
         private void ApiPlatformComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -218,9 +194,6 @@ namespace XUnity_LLMTranslatePlus.Views
 
             // 并发配置
             config.MaxConcurrentTranslations = (int)MaxConcurrentTranslationsNumberBox.Value;
-
-            // 系统提示词
-            config.SystemPrompt = SystemPromptTextBox.Text;
 
             return config;
         }
@@ -344,11 +317,6 @@ namespace XUnity_LLMTranslatePlus.Views
             }
         }
 
-        private void ResetPromptButton_Click(object sender, RoutedEventArgs e)
-        {
-            SystemPromptTextBox.Text = "你是一个专业的游戏文本翻译助手。请将以下文本翻译成{目标语言}。保持原文的语气和风格，确保翻译准确、流畅、自然。\n\n【重要】如果文本中包含形如【SPECIAL_数字】的占位符，请务必在译文中完整保留这些占位符，不要翻译或修改它们。\n\n原文：{原文}\n\n术语参考：{术语}\n\n上下文参考：{上下文}\n\n请只输出翻译结果，不要包含任何解释或额外内容。";
-        }
-
         private async void RefreshModelsButton_Click(object sender, RoutedEventArgs e)
         {
             if (_apiClient == null)
@@ -429,136 +397,6 @@ namespace XUnity_LLMTranslatePlus.Views
             }
         }
 
-        private void AddTermButton_Click(object sender, RoutedEventArgs e)
-        {
-            var newTerm = new Term { Original = "", Translation = "", Priority = 1, Enabled = true };
-            Terms.Add(newTerm);
-
-            // 自动滚动到新添加的项
-            TermsListView.SelectedItem = newTerm;
-            TermsListView.ScrollIntoView(newTerm);
-        }
-
-        private void DeleteTermButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (TermsListView.SelectedItem is Term selectedTerm)
-            {
-                Terms.Remove(selectedTerm);
-                _terminologyService?.RemoveTerm(selectedTerm);
-            }
-        }
-
-        private async void ImportTermsButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_terminologyService == null)
-            {
-                ContentDialog dialog = new ContentDialog
-                {
-                    Title = "错误",
-                    Content = "术语库服务未初始化",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await dialog.ShowAsync();
-                return;
-            }
-
-            try
-            {
-                var picker = new FileOpenPicker();
-                picker.FileTypeFilter.Add(".csv");
-
-                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-                WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-                var file = await picker.PickSingleFileAsync();
-                if (file != null)
-                {
-                    int count = await _terminologyService.ImportCsvAsync(file.Path);
-                    
-                    // 刷新 UI
-                    var terms = _terminologyService.GetTerms();
-                    Terms.Clear();
-                    foreach (var term in terms)
-                    {
-                        Terms.Add(term);
-                    }
-
-                    ContentDialog successDialog = new ContentDialog
-                    {
-                        Title = "导入成功",
-                        Content = $"成功导入 {count} 条术语",
-                        CloseButtonText = "确定",
-                        XamlRoot = this.XamlRoot
-                    };
-                    await successDialog.ShowAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                ContentDialog errorDialog = new ContentDialog
-                {
-                    Title = "导入失败",
-                    Content = $"导入失败: {ex.Message}",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await errorDialog.ShowAsync();
-            }
-        }
-
-        private async void ExportTermsButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_terminologyService == null)
-            {
-                ContentDialog dialog = new ContentDialog
-                {
-                    Title = "错误",
-                    Content = "术语库服务未初始化",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await dialog.ShowAsync();
-                return;
-            }
-
-            try
-            {
-                var picker = new FileSavePicker();
-                picker.FileTypeChoices.Add("CSV 文件", new[] { ".csv" });
-                picker.SuggestedFileName = "terms";
-
-                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-                WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-                var file = await picker.PickSaveFileAsync();
-                if (file != null)
-                {
-                    await _terminologyService.ExportCsvAsync(file.Path);
-
-                    ContentDialog successDialog = new ContentDialog
-                    {
-                        Title = "导出成功",
-                        Content = "术语库导出成功",
-                        CloseButtonText = "确定",
-                        XamlRoot = this.XamlRoot
-                    };
-                    await successDialog.ShowAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                ContentDialog errorDialog = new ContentDialog
-                {
-                    Title = "导出失败",
-                    Content = $"导出失败: {ex.Message}",
-                    CloseButtonText = "确定",
-                    XamlRoot = this.XamlRoot
-                };
-                await errorDialog.ShowAsync();
-            }
-        }
-
         /// <summary>
         /// 触发自动保存（带防抖）
         /// </summary>
@@ -576,7 +414,7 @@ namespace XUnity_LLMTranslatePlus.Views
         /// </summary>
         private async System.Threading.Tasks.Task AutoSaveConfigAsync()
         {
-            if (_configService == null || _terminologyService == null) return;
+            if (_configService == null) return;
 
             try
             {
@@ -586,14 +424,6 @@ namespace XUnity_LLMTranslatePlus.Views
 
                 // 更新本地缓存
                 _currentConfig = config;
-
-                // 保存术语库 - 先清空再添加
-                _terminologyService.ClearTerms();
-                foreach (var term in Terms)
-                {
-                    _terminologyService.AddTerm(term);
-                }
-                await _terminologyService.SaveTermsAsync();
 
                 _logService?.Log("API 配置已自动保存", LogLevel.Debug);
             }
@@ -635,11 +465,6 @@ namespace XUnity_LLMTranslatePlus.Views
         }
 
         private void MaxConcurrentTranslationsNumberBox_ValueChanged(Microsoft.UI.Xaml.Controls.NumberBox sender, Microsoft.UI.Xaml.Controls.NumberBoxValueChangedEventArgs args)
-        {
-            TriggerAutoSave();
-        }
-
-        private void SystemPromptTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             TriggerAutoSave();
         }

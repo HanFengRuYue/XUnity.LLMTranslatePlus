@@ -1,0 +1,206 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using XUnity_LLMTranslatePlus.Models;
+
+namespace XUnity_LLMTranslatePlus.Services
+{
+    /// <summary>
+    /// 智能术语提取服务
+    /// </summary>
+    public class SmartTerminologyService
+    {
+        private readonly ApiClient _apiClient;
+        private readonly TerminologyService _terminologyService;
+        private readonly LogService _logService;
+        private readonly HashSet<string> _processedTexts = new HashSet<string>();
+        private readonly object _processedLock = new object();
+
+        // 智能提取的默认提示词模板
+        private const string DefaultExtractionPrompt = @"请分析以下游戏文本的翻译，提取其中的专有名词（人名、地名、技能名、物品名、组织名等）。
+
+原文：{原文}
+译文：{译文}
+
+要求：
+1. 只提取专有名词，不要提取普通词汇
+2. 确保提取的术语在原文和译文中是对应的
+3. 返回 JSON 数组格式，每个元素包含 original 和 translation 字段
+4. 只返回 JSON，不要其他内容
+5. 如果没有专有名词，返回空数组 []
+
+示例输出：
+[{""original"": ""艾泽拉斯"", ""translation"": ""艾泽拉斯""}, {""original"": ""火球术"", ""translation"": ""火球术""}]";
+
+        public SmartTerminologyService(
+            ApiClient apiClient,
+            TerminologyService terminologyService,
+            LogService logService)
+        {
+            _apiClient = apiClient;
+            _terminologyService = terminologyService;
+            _logService = logService;
+        }
+
+        /// <summary>
+        /// 从翻译结果中智能提取术语
+        /// </summary>
+        public async Task ExtractAndAddTermsAsync(
+            string originalText,
+            string translatedText,
+            AppConfig config,
+            CancellationToken cancellationToken = default)
+        {
+            // 检查是否启用智能提取
+            if (!config.EnableSmartTerminology)
+            {
+                return;
+            }
+
+            // 检查是否已处理过该文本
+            lock (_processedLock)
+            {
+                if (_processedTexts.Contains(originalText))
+                {
+                    return;
+                }
+                _processedTexts.Add(originalText);
+            }
+
+            try
+            {
+                // 构建提取提示词
+                string extractionPrompt = DefaultExtractionPrompt
+                    .Replace("{原文}", originalText)
+                    .Replace("{译文}", translatedText);
+
+                await _logService.LogAsync($"[智能术语] 开始提取: {originalText}", LogLevel.Debug);
+
+                // 调用 API 提取术语
+                string response = await _apiClient.TranslateAsync(
+                    extractionPrompt,
+                    "你是一个专业的术语提取助手。",
+                    config,
+                    cancellationToken);
+
+                await _logService.LogAsync($"[智能术语] API 响应: {response}", LogLevel.Debug);
+
+                // 解析响应
+                var extractedTerms = ParseTerminologyResponse(response);
+
+                // 添加到术语库
+                if (extractedTerms.Count > 0)
+                {
+                    foreach (var term in extractedTerms)
+                    {
+                        // 检查是否已存在
+                        if (!IsTermExists(term.Original))
+                        {
+                            var newTerm = new Term
+                            {
+                                Original = term.Original,
+                                Translation = term.Translation,
+                                Priority = 50, // 智能提取的术语默认优先级为 50
+                                Enabled = true
+                            };
+
+                            _terminologyService.AddTerm(newTerm);
+                            await _logService.LogAsync(
+                                $"[智能术语] 已添加: {term.Original} -> {term.Translation}",
+                                LogLevel.Info);
+                        }
+                    }
+
+                    // 保存术语库
+                    await _terminologyService.SaveTermsAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                // 智能提取失败不影响翻译流程，静默处理
+                await _logService.LogAsync(
+                    $"[智能术语] 提取失败: {ex.Message}",
+                    LogLevel.Warning);
+            }
+        }
+
+        /// <summary>
+        /// 解析 AI 返回的术语 JSON
+        /// </summary>
+        private List<ExtractedTerm> ParseTerminologyResponse(string jsonResponse)
+        {
+            try
+            {
+                // 清理响应（移除可能的 markdown 代码块标记）
+                string cleaned = jsonResponse.Trim();
+                if (cleaned.StartsWith("```json"))
+                {
+                    cleaned = cleaned.Substring("```json".Length);
+                }
+                if (cleaned.StartsWith("```"))
+                {
+                    cleaned = cleaned.Substring("```".Length);
+                }
+                if (cleaned.EndsWith("```"))
+                {
+                    cleaned = cleaned.Substring(0, cleaned.Length - 3);
+                }
+                cleaned = cleaned.Trim();
+
+                // 尝试找到 JSON 数组的开始和结束
+                int startIndex = cleaned.IndexOf('[');
+                int endIndex = cleaned.LastIndexOf(']');
+
+                if (startIndex >= 0 && endIndex > startIndex)
+                {
+                    cleaned = cleaned.Substring(startIndex, endIndex - startIndex + 1);
+                }
+
+                // 解析 JSON
+                var terms = JsonSerializer.Deserialize<List<ExtractedTerm>>(cleaned, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return terms ?? new List<ExtractedTerm>();
+            }
+            catch (Exception ex)
+            {
+                _logService.Log($"[智能术语] JSON 解析失败: {ex.Message}", LogLevel.Warning);
+                return new List<ExtractedTerm>();
+            }
+        }
+
+        /// <summary>
+        /// 检查术语是否已存在
+        /// </summary>
+        private bool IsTermExists(string original)
+        {
+            var existingTerms = _terminologyService.GetTerms();
+            return existingTerms.Any(t => t.Original.Equals(original, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// 清空已处理文本缓存
+        /// </summary>
+        public void ClearProcessedCache()
+        {
+            lock (_processedLock)
+            {
+                _processedTexts.Clear();
+            }
+        }
+
+        /// <summary>
+        /// 提取的术语数据结构
+        /// </summary>
+        private class ExtractedTerm
+        {
+            public string Original { get; set; } = "";
+            public string Translation { get; set; } = "";
+        }
+    }
+}
