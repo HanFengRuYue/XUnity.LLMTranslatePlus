@@ -60,7 +60,15 @@ winget install Microsoft.DotNet.DesktopRuntime.9
 3. 设置目标语言（默认：简体中文）
 4. 调整并发数和上下文行数（可选）
 
-### 4. 开始翻译
+### 4. 修改 XUnity 配置
+
+1. 找到游戏目录下的 XUnity 配置文件：`BepInEx\config\AutoTranslatorConfig.ini`
+2. 打开配置文件，修改以下设置：
+   - 将 `Endpoint` 的值改为 `Passthrough`
+   - 将 `ReloadTranslationsOnFileChange` 改为 `True`
+3. 保存配置文件
+
+### 5. 开始翻译
 
 1. 进入 **主页**
 2. 点击 **启动监控** 按钮
