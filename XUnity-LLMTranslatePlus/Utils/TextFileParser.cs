@@ -312,7 +312,6 @@ namespace XUnity_LLMTranslatePlus.Utils
             // 重试次数用尽
             throw new FileOperationException(
                 $"保存文件失败: 文件被占用，已重试 {maxRetries} 次",
-                null,
                 filePath,
                 "Save");
         }
