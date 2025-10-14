@@ -209,7 +209,33 @@ public async Task<string> TranslateAsync(..., CancellationToken cancellationToke
 
 Always propagate CancellationToken through async call chains.
 
-### 7. Framework-Dependent Deployment
+### 7. FileShare.ReadWrite for Concurrent File Access
+**Location**: `Utils/TextFileParser.cs`
+
+File reading uses `FileShare.ReadWrite` to prevent blocking XUnity's write operations:
+
+```csharp
+await using (var fileStream = new FileStream(
+    validatedPath,
+    FileMode.Open,
+    FileAccess.Read,
+    FileShare.ReadWrite,  // Critical: allows XUnity to write while we read
+    4096,
+    FileOptions.Asynchronous))
+{
+    using var reader = new StreamReader(fileStream, Encoding.UTF8);
+    // Read file line by line...
+}
+```
+
+**Key Points**:
+- **Reading**: Use `FileShare.ReadWrite` to allow other processes (XUnity) to read/write simultaneously
+- **Writing**: Use `FileShare.Read` (current implementation) to allow reads but prevent concurrent writes
+- **Retry mechanism**: Both read and write operations have 5-attempt retry with random delays to handle transient conflicts
+
+**Why this matters**: The default `File.ReadAllLinesAsync()` uses exclusive file locking, which blocks XUnity from adding new text to the translation file. This caused "file in use" errors where XUnity couldn't write while our app was reading.
+
+### 8. Framework-Dependent Deployment
 **Location**: `XUnity-LLMTranslatePlus.csproj`, `App.xaml.cs`
 
 The project uses framework-dependent deployment to reduce file size by 53% (from ~84MB to ~40MB):
@@ -637,6 +663,8 @@ Pages are instantiated on navigation. No page caching.
 
 18. **FileSystemWatcher Infinite Loop**: When your code writes to a file being monitored by FileSystemWatcher, it triggers its own `Changed` event, creating an infinite loop. Always temporarily disable `FileSystemWatcher.EnableRaisingEvents` during file writes, add a stabilization delay (300ms), and re-enable in a `finally` block. This is critical for batch write operations in FileMonitorService.
 
+19. **File Read Locking**: NEVER use `File.ReadAllLinesAsync()` or similar methods without specifying `FileShare` parameters when reading files that other processes (like XUnity) may write to. The default behavior uses exclusive locking, preventing other processes from writing. Always use `FileStream` with `FileShare.ReadWrite` for reading shared files. Similarly, use `FileShare.Read` when writing to allow concurrent reads. TextFileParser.cs implements this pattern correctly with retry mechanisms for both operations.
+
 ## Testing Translation API
 
 Use the built-in connection test:
@@ -712,3 +740,4 @@ This sends "Hello" with prompt "Translate to Chinese:" to verify connectivity.
   - **Fixed retry cancellation**: ApiClient retry delays now properly support CancellationToken for high-concurrency scenarios
   - **Updated MaxTokens default**: Changed from 2000 to 4096 to better accommodate modern LLM context windows
   - **Improved manual file path UX**: Manual file path option now only appears when auto-detection is disabled or fails
+  - **CRITICAL: Fixed file locking issue**: Changed `ParseFileAsync()` to use `FileStream` with `FileShare.ReadWrite` instead of `File.ReadAllLinesAsync()`, preventing app from blocking XUnity's write operations. Added retry mechanism (5 attempts, 100-500ms random delay) for read operations. This resolves the persistent "file in use" error where XUnity couldn't add new text while our app was reading the translation file.

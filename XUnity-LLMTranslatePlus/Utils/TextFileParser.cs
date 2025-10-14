@@ -101,7 +101,7 @@ namespace XUnity_LLMTranslatePlus.Utils
         */
 
         /// <summary>
-        /// 解析文件
+        /// 解析文件（带重试机制，使用 FileShare.ReadWrite 避免锁定文件）
         /// </summary>
         public async Task<List<TranslationEntry>> ParseFileAsync(string filePath, CancellationToken cancellationToken = default)
         {
@@ -111,69 +111,110 @@ namespace XUnity_LLMTranslatePlus.Utils
             PathValidator.ValidateFileExists(filePath);
             string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
 
-            try
+            const int maxRetries = 5;
+            int retryCount = 0;
+            Random random = new Random();
+
+            while (retryCount < maxRetries)
             {
-                var lines = await File.ReadAllLinesAsync(validatedPath, Encoding.UTF8, cancellationToken);
-                
-                lock (_lockObject)
+                try
                 {
-                    _fileLines = lines.ToList();
-                    _translations.Clear();
-                }
+                    List<string> lines;
 
-                foreach (var line in lines)
-                {
-                    // 跳过空行和注释
-                    if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("//"))
+                    // 使用 FileStream 明确指定 FileShare.ReadWrite，避免阻止 XUnity 写入
+                    await using (var fileStream = new FileStream(
+                        validatedPath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite,  // 关键：允许其他进程同时读写
+                        4096,
+                        FileOptions.Asynchronous))
                     {
-                        continue;
-                    }
-
-                    // 解析键值对（格式：key=value）
-                    int separatorIndex = line.IndexOf('=');
-                    if (separatorIndex > 0)
-                    {
-                        // 使用 Span<char> 优化字符串操作，减少内存分配
-                        ReadOnlySpan<char> lineSpan = line.AsSpan();
-                        string key = lineSpan.Slice(0, separatorIndex).Trim().ToString();
-                        ReadOnlySpan<char> valueSpan = lineSpan.Slice(separatorIndex + 1).Trim();
-
-                        // 移除可能的引号
-                        if (valueSpan.Length >= 2 && valueSpan[0] == '"' && valueSpan[^1] == '"')
+                        using var reader = new StreamReader(fileStream, Encoding.UTF8);
+                        lines = new List<string>();
+                        string? line;
+                        while ((line = await reader.ReadLineAsync()) != null)
                         {
-                            valueSpan = valueSpan.Slice(1, valueSpan.Length - 2);
-                        }
-
-                        string value = valueSpan.ToString();
-
-                        var entry = new TranslationEntry
-                        {
-                            Key = key,
-                            Value = value,
-                            IsTranslated = !string.Equals(key, value, StringComparison.Ordinal) 
-                                           && !IsCorruptedTranslation(key, value),
-                            HasError = false
-                        };
-
-                        entries.Add(entry);
-
-                        lock (_lockObject)
-                        {
-                            _translations[key] = value;
+                            cancellationToken.ThrowIfCancellationRequested();
+                            lines.Add(line);
                         }
                     }
+
+                    // 读取成功，处理数据
+                    lock (_lockObject)
+                    {
+                        _fileLines = lines;
+                        _translations.Clear();
+                    }
+
+                    foreach (var line in lines)
+                    {
+                        // 跳过空行和注释
+                        if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("//"))
+                        {
+                            continue;
+                        }
+
+                        // 解析键值对（格式：key=value）
+                        int separatorIndex = line.IndexOf('=');
+                        if (separatorIndex > 0)
+                        {
+                            // 使用 Span<char> 优化字符串操作，减少内存分配
+                            ReadOnlySpan<char> lineSpan = line.AsSpan();
+                            string key = lineSpan.Slice(0, separatorIndex).Trim().ToString();
+                            ReadOnlySpan<char> valueSpan = lineSpan.Slice(separatorIndex + 1).Trim();
+
+                            // 移除可能的引号
+                            if (valueSpan.Length >= 2 && valueSpan[0] == '"' && valueSpan[^1] == '"')
+                            {
+                                valueSpan = valueSpan.Slice(1, valueSpan.Length - 2);
+                            }
+
+                            string value = valueSpan.ToString();
+
+                            var entry = new TranslationEntry
+                            {
+                                Key = key,
+                                Value = value,
+                                IsTranslated = !string.Equals(key, value, StringComparison.Ordinal)
+                                               && !IsCorruptedTranslation(key, value),
+                                HasError = false
+                            };
+
+                            entries.Add(entry);
+
+                            lock (_lockObject)
+                            {
+                                _translations[key] = value;
+                            }
+                        }
+                    }
+
+                    // 成功解析，退出重试循环
+                    return entries;
+                }
+                catch (IOException) when (retryCount < maxRetries - 1)
+                {
+                    // 文件被占用，等待后重试
+                    retryCount++;
+                    int delayMs = random.Next(100, 500); // 随机延迟 100-500ms
+                    await Task.Delay(delayMs, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    throw new FileOperationException(
+                        $"解析文件失败: {ex.Message}",
+                        ex,
+                        filePath,
+                        "Parse");
                 }
             }
-            catch (Exception ex)
-            {
-                throw new FileOperationException(
-                    $"解析文件失败: {ex.Message}",
-                    ex,
-                    filePath,
-                    "Parse");
-            }
 
-            return entries;
+            // 重试次数用尽
+            throw new FileOperationException(
+                $"解析文件失败: 文件被占用，已重试 {maxRetries} 次",
+                filePath,
+                "Parse");
         }
 
         /// <summary>
