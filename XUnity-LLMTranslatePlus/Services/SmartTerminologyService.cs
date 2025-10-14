@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -15,6 +16,7 @@ namespace XUnity_LLMTranslatePlus.Services
     {
         private readonly ApiClient _apiClient;
         private readonly TerminologyService _terminologyService;
+        private readonly ConfigService _configService;
         private readonly LogService _logService;
         private readonly HashSet<string> _processedTexts = new HashSet<string>();
         private readonly object _processedLock = new object();
@@ -38,10 +40,12 @@ namespace XUnity_LLMTranslatePlus.Services
         public SmartTerminologyService(
             ApiClient apiClient,
             TerminologyService terminologyService,
+            ConfigService configService,
             LogService logService)
         {
             _apiClient = apiClient;
             _terminologyService = terminologyService;
+            _configService = configService;
             _logService = logService;
         }
 
@@ -103,7 +107,6 @@ namespace XUnity_LLMTranslatePlus.Services
                             {
                                 Original = term.Original,
                                 Translation = term.Translation,
-                                Priority = 50, // 智能提取的术语默认优先级为 50
                                 Enabled = true
                             };
 
@@ -114,8 +117,9 @@ namespace XUnity_LLMTranslatePlus.Services
                         }
                     }
 
-                    // 保存术语库
-                    await _terminologyService.SaveTermsAsync();
+                    // 保存术语库到当前选中的文件
+                    string terminologyFilePath = GetCurrentTerminologyFilePath();
+                    await _terminologyService.SaveTermsAsync(terminologyFilePath);
                 }
             }
             catch (Exception ex)
@@ -192,6 +196,31 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 _processedTexts.Clear();
             }
+        }
+
+        /// <summary>
+        /// 获取当前术语库文件路径
+        /// </summary>
+        private string GetCurrentTerminologyFilePath()
+        {
+            var config = _configService.GetCurrentConfig();
+            string fileName = string.IsNullOrEmpty(config.CurrentTerminologyFile)
+                ? "default"
+                : config.CurrentTerminologyFile;
+
+            string terminologiesFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "XUnity-LLMTranslatePlus",
+                "Terminologies"
+            );
+
+            // 确保文件夹存在
+            if (!Directory.Exists(terminologiesFolder))
+            {
+                Directory.CreateDirectory(terminologiesFolder);
+            }
+
+            return Path.Combine(terminologiesFolder, $"{fileName}.csv");
         }
 
         /// <summary>

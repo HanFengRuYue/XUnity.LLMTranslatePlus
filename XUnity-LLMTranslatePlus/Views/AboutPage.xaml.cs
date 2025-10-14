@@ -72,12 +72,29 @@ namespace XUnity_LLMTranslatePlus.Views
                     if (_configService != null)
                     {
                         var configPath = _configService.GetConfigFilePath();
+                        var appDataFolder = _configService.GetAppDataFolder();
 
                         // 删除配置文件
                         if (File.Exists(configPath))
                         {
                             File.Delete(configPath);
                             _logService?.Log("配置文件已删除", LogLevel.Info);
+                        }
+
+                        // 删除术语库文件夹
+                        var terminologiesFolder = Path.Combine(appDataFolder, "Terminologies");
+                        if (Directory.Exists(terminologiesFolder))
+                        {
+                            Directory.Delete(terminologiesFolder, true);
+                            _logService?.Log("术语库文件夹已删除", LogLevel.Info);
+                        }
+
+                        // 删除默认术语库文件（如果存在）
+                        var defaultTermsFile = Path.Combine(appDataFolder, "terms.csv");
+                        if (File.Exists(defaultTermsFile))
+                        {
+                            File.Delete(defaultTermsFile);
+                            _logService?.Log("默认术语库文件已删除", LogLevel.Info);
                         }
 
                         // 显示成功消息

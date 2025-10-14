@@ -51,6 +51,19 @@ finally { _semaphore.Release(); }
 - Use `WaitToReadAsync()` + `TryRead()` with `Task.WhenAny()` (not `ReadAsync()`)
 - Store `.AsTask()` result in variable - calling multiple times creates different Task instances
 - Disable FileSystemWatcher during writes (300ms stabilization delay) to prevent infinite loops
+- **Use `TryWrite()` instead of `WriteAsync()`** when writing to Channels that may be closed (prevents exceptions during shutdown)
+
+```csharp
+// ✅ Correct - graceful handling when Channel closed
+if (!_writeQueue.Writer.TryWrite(batch))
+{
+    await _logService.LogAsync("Queue closed, exiting", LogLevel.Debug);
+    break;
+}
+
+// ❌ Wrong - throws ChannelClosedException during shutdown
+await _writeQueue.Writer.WriteAsync(batch, cancellationToken);
+```
 
 ### 3. Thread-Safe Context Cache (TranslationService.cs)
 Context feature stores last N translations (default 10, configurable 1-100) for AI reference.
@@ -148,6 +161,8 @@ AppData/XUnity-LLMTranslatePlus/
 **Smart Extraction** (SmartTerminologyService.cs):
 - AI-powered extraction of proper nouns during translation
 - Runs asynchronously via `Task.Run` (non-blocking)
+- **Saves to current terminology file** via `GetCurrentTerminologyFilePath()` which reads `AppConfig.CurrentTerminologyFile`
+- Requires `ConfigService` dependency to determine save path
 - Default priority: 50 for extracted terms
 - Duplicate prevention: Case-insensitive check with `IsTermExists()`
 - Tracks processed texts with `HashSet<string>` to avoid re-extraction
@@ -224,7 +239,15 @@ private void TriggerAutoSave()
 - TerminologyPage: 800ms (complex with file operations)
 - TranslationSettingsPage: 500ms (simpler settings)
 
-**Critical**: `GetConfigFromUIAsync()` must ALWAYS load fresh config first via `LoadConfigAsync()` to preserve settings from other pages, then only update relevant fields.
+**Critical**:
+- `GetConfigFromUIAsync()` must ALWAYS load fresh config first via `LoadConfigAsync()` to preserve settings from other pages, then only update relevant fields.
+- After saving config, update the local `_currentConfig` field to prevent stale data from being saved later:
+  ```csharp
+  var config = await _configService.LoadConfigAsync();
+  config.SomeSetting = newValue;
+  await _configService.SaveConfigAsync(config);
+  _currentConfig = config;  // ← Critical: Update local cache
+  ```
 
 ### Pages
 - HomePage - Status, start/stop monitoring
@@ -262,6 +285,12 @@ private void TriggerAutoSave()
 12. **Async All The Way**: Never use `.Result` or `.Wait()`. Always propagate `CancellationToken`.
 
 13. **Smart Terminology Extraction**: Runs in background via `Task.Run`, failures don't interrupt translations. Uses `HashSet<string>` to track processed texts (prevents duplicate extraction). JSON response parsing handles markdown code blocks (`\`\`\`json`). Always case-insensitive duplicate check before adding terms.
+
+14. **ConfigService.SaveConfigAsync Completeness**: When adding new fields to `AppConfig`, you MUST add them to the `configToSave` copy in `ConfigService.SaveConfigAsync()`. Missing fields will be reset to defaults on every save. Always verify all AppConfig properties are included.
+
+15. **LoadAndProcessFileAsync Timing**: This method is called BEFORE `_isMonitoring = true` in `StartMonitoringAsync()`. Do not add state checks that depend on `IsMonitoring` being true inside the initial file processing logic, or startup will fail.
+
+16. **Channel Write During Shutdown**: Use `TryWrite()` instead of `WriteAsync()` for Channels that may be closed during shutdown. Check return value and exit gracefully if false.
 
 ## Performance Notes
 

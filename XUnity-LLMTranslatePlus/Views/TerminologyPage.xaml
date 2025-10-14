@@ -98,13 +98,11 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="3*" MinWidth="150"/>
                                         <ColumnDefinition Width="3*" MinWidth="150"/>
-                                        <ColumnDefinition Width="100"/>
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="原文" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                     <TextBlock Grid.Column="1" Text="译文" FontWeight="SemiBold" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                                    <TextBlock Grid.Column="2" Text="优先级" FontWeight="SemiBold" TextAlignment="Center" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="3" Text="启用" FontWeight="SemiBold" TextAlignment="Center" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="2" Text="启用" FontWeight="SemiBold" TextAlignment="Center" VerticalAlignment="Center"/>
                                 </Grid>
                             </DataTemplate>
                         </ListView.HeaderTemplate>
@@ -114,32 +112,28 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="3*" MinWidth="150"/>
                                         <ColumnDefinition Width="3*" MinWidth="150"/>
-                                        <ColumnDefinition Width="100"/>
                                         <ColumnDefinition Width="80"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBox Grid.Column="0"
                                              Text="{Binding Original, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              VerticalAlignment="Center"
                                              PlaceholderText="原文"
-                                             BorderThickness="1"/>
+                                             BorderThickness="1"
+                                             TextChanged="TermTextBox_TextChanged"/>
                                     <TextBox Grid.Column="1"
                                              Text="{Binding Translation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              VerticalAlignment="Center"
                                              PlaceholderText="译文"
                                              BorderThickness="1"
-                                             Margin="12,0,0,0"/>
-                                    <NumberBox Grid.Column="2"
-                                               Value="{Binding Priority, Mode=TwoWay}"
-                                               HorizontalAlignment="Stretch"
-                                               Minimum="1"
-                                               Maximum="100"
-                                               SpinButtonPlacementMode="Compact"
-                                               Margin="12,0,0,0"/>
-                                    <CheckBox Grid.Column="3"
+                                             Margin="12,0,0,0"
+                                             TextChanged="TermTextBox_TextChanged"/>
+                                    <CheckBox Grid.Column="2"
                                               IsChecked="{Binding Enabled, Mode=TwoWay}"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
-                                              MinWidth="0"/>
+                                              MinWidth="0"
+                                              Checked="TermCheckBox_Changed"
+                                              Unchecked="TermCheckBox_Changed"/>
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>

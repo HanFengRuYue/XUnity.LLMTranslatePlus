@@ -54,6 +54,10 @@ namespace XUnity_LLMTranslatePlus.Models
 
         // 错误控制
         public int ErrorThreshold { get; set; } = 100; // 错误阈值，默认100个错误后停止
+
+        // 自动刷新配置
+        public bool EnableAutoRefresh { get; set; } = false; // 自动发送 ALT+R 刷新游戏翻译
+        public int AutoRefreshInterval { get; set; } = 1; // 自动刷新间隔（秒），范围 1-60
     }
 
     /// <summary>
@@ -63,7 +67,6 @@ namespace XUnity_LLMTranslatePlus.Models
     {
         public string Original { get; set; } = "";
         public string Translation { get; set; } = "";
-        public int Priority { get; set; } = 1;
         public bool Enabled { get; set; } = true;
     }
 

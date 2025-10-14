@@ -144,6 +144,12 @@ namespace XUnity_LLMTranslatePlus.Services
                     SingleWriter = false   // 可能有多个生产者（文件监控、初始加载）
                 });
 
+                // 清空已处理文本集合（必须在 LoadAndProcessFileAsync 之前）
+                lock (_processedTexts)
+                {
+                    _processedTexts.Clear();
+                }
+
                 // 初始加载文件
                 await LoadAndProcessFileAsync();
 
@@ -159,12 +165,6 @@ namespace XUnity_LLMTranslatePlus.Services
                     };
 
                     _fileWatcher.Changed += OnFileChanged;
-                }
-
-                // 清空已处理文本集合
-                lock (_processedTexts)
-                {
-                    _processedTexts.Clear();
                 }
 
                 lock (_lockObject)
@@ -327,15 +327,27 @@ namespace XUnity_LLMTranslatePlus.Services
         /// </summary>
         private async Task LoadAndProcessFileAsync()
         {
-            if (_parser == null || _monitoredFilePath == null)
+            // 使用局部变量避免多线程竞态条件
+            var parser = _parser;
+            var filePath = _monitoredFilePath;
+
+            if (parser == null || filePath == null)
             {
                 return;
             }
 
             try
             {
-                var entries = await _parser.ParseFileAsync(_monitoredFilePath);
-                var untranslated = _parser.GetUntranslatedEntries(entries);
+                var entries = await parser.ParseFileAsync(filePath);
+
+                // 检查 entries 是否为 null
+                if (entries == null)
+                {
+                    await _logService.LogAsync("文件解析返回 null", LogLevel.Warning);
+                    return;
+                }
+
+                var untranslated = parser.GetUntranslatedEntries(entries);
 
                 if (untranslated.Count > 0)
                 {
@@ -510,9 +522,14 @@ namespace XUnity_LLMTranslatePlus.Services
                         // 更新内存中的翻译
                         _parser.UpdateTranslation(text, translated);
 
-                        // 加入批量写入队列而不是立即写入
+                        // 加入批量写入队列而不是立即写入（使用 TryWrite 避免 Channel 关闭时抛出异常）
                         var batch = new Dictionary<string, string> { { text, translated } };
-                        await _writeQueue.Writer.WriteAsync(batch, cancellationToken);
+                        if (!_writeQueue.Writer.TryWrite(batch))
+                        {
+                            // Channel 已关闭，记录日志但不抛出异常
+                            await _logService.LogAsync($"[消费者{consumerId}] 写入队列已关闭，跳过写入", LogLevel.Debug);
+                            break;
+                        }
 
                         await _logService.LogAsync($"[消费者{consumerId}] 翻译完成: {preview} -> {translated}", LogLevel.Info);
 

@@ -48,6 +48,13 @@ namespace XUnity_LLMTranslatePlus.Views
                 _ = AutoSaveTermsAsync();
             };
 
+            // 页面卸载时立即保存
+            this.Unloaded += async (s, e) =>
+            {
+                _autoSaveTimer?.Stop();
+                await AutoSaveTermsAsync();
+            };
+
             // 加载配置和术语
             LoadConfiguration();
         }
@@ -68,7 +75,9 @@ namespace XUnity_LLMTranslatePlus.Views
 
                 if (_terminologyService != null)
                 {
-                    await _terminologyService.LoadTermsAsync();
+                    // 根据配置加载对应的术语库文件
+                    string terminologyPath = GetTerminologyFilePath(_currentTerminologyFile);
+                    await _terminologyService.LoadTermsAsync(terminologyPath);
                     var terms = _terminologyService.GetTerms();
                     Terms.Clear();
                     foreach (var term in terms)
@@ -333,7 +342,8 @@ namespace XUnity_LLMTranslatePlus.Views
                     // 重新加载术语
                     if (_terminologyService != null)
                     {
-                        await _terminologyService.LoadTermsAsync();
+                        string terminologyPath = GetTerminologyFilePath(_currentTerminologyFile);
+                        await _terminologyService.LoadTermsAsync(terminologyPath);
                         var terms = _terminologyService.GetTerms();
                         Terms.Clear();
                         foreach (var term in terms)
@@ -354,7 +364,7 @@ namespace XUnity_LLMTranslatePlus.Views
 
         private void AddTermButton_Click(object sender, RoutedEventArgs e)
         {
-            var newTerm = new Term { Original = "", Translation = "", Priority = 1, Enabled = true };
+            var newTerm = new Term { Original = "", Translation = "", Enabled = true };
             Terms.Add(newTerm);
 
             // 自动滚动到新添加的项
@@ -456,9 +466,13 @@ namespace XUnity_LLMTranslatePlus.Views
 
             try
             {
+                // 加载最新配置以保留其他页面的设置
                 var config = await _configService.LoadConfigAsync();
                 config.EnableSmartTerminology = EnableSmartTerminologyToggle.IsOn;
                 await _configService.SaveConfigAsync(config);
+
+                // 更新当前配置字段，防止被其他操作覆盖
+                _currentConfig = config;
 
                 _logService?.Log($"智能术语提取已{(config.EnableSmartTerminology ? "启用" : "禁用")}", LogLevel.Info);
             }
@@ -478,6 +492,24 @@ namespace XUnity_LLMTranslatePlus.Views
             // 重启定时器（防抖）
             _autoSaveTimer?.Stop();
             _autoSaveTimer?.Start();
+        }
+
+        /// <summary>
+        /// 术语 TextBox 文本变化时触发自动保存
+        /// </summary>
+        private void TermTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isLoadingConfig) return;
+            TriggerAutoSave();
+        }
+
+        /// <summary>
+        /// 术语 CheckBox 状态变化时触发自动保存
+        /// </summary>
+        private void TermCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingConfig) return;
+            TriggerAutoSave();
         }
 
         /// <summary>

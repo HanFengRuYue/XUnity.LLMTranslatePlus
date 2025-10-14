@@ -225,7 +225,11 @@ namespace XUnity_LLMTranslatePlus.Services
                     ContextLines = config.ContextLines,
                     EnableCache = config.EnableCache,
                     ExportLog = config.ExportLog,
-                    ErrorThreshold = config.ErrorThreshold
+                    ErrorThreshold = config.ErrorThreshold,
+                    EnableAutoRefresh = config.EnableAutoRefresh,
+                    AutoRefreshInterval = config.AutoRefreshInterval,
+                    EnableSmartTerminology = config.EnableSmartTerminology,
+                    CurrentTerminologyFile = config.CurrentTerminologyFile
                 };
 
                 // 加密 API Key

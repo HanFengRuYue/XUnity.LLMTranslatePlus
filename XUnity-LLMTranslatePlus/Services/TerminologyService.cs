@@ -155,7 +155,7 @@ namespace XUnity_LLMTranslatePlus.Services
         {
             lock (_lockObject)
             {
-                return _terms.OrderByDescending(t => t.Priority).ToList();
+                return _terms.OrderByDescending(t => t.Original.Length).ToList();
             }
         }
 
@@ -267,8 +267,7 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 enabledTerms = _terms
                     .Where(t => t.Enabled)
-                    .OrderByDescending(t => t.Priority)
-                    .ThenByDescending(t => t.Original.Length) // 优先替换较长的术语
+                    .OrderByDescending(t => t.Original.Length) // 优先替换较长的术语
                     .ToList();
             }
 
@@ -299,7 +298,7 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 enabledTerms = _terms
                     .Where(t => t.Enabled && text.Contains(t.Original))
-                    .OrderByDescending(t => t.Priority)
+                    .OrderByDescending(t => t.Original.Length)
                     .ToList();
             }
 

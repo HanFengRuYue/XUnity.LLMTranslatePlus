@@ -46,6 +46,7 @@ namespace XUnity_LLMTranslatePlus
             services.AddSingleton<TranslationService>();
             services.AddSingleton<FileMonitorService>();
             services.AddSingleton<TextEditorService>();
+            services.AddSingleton<HotkeyService>();
 
             _serviceProvider = services.BuildServiceProvider();
 

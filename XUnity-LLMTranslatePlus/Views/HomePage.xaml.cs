@@ -24,11 +24,16 @@ namespace XUnity_LLMTranslatePlus.Views
         private readonly TranslationService? _translationService;
         private readonly ConfigService? _configService;
         private readonly LogService? _logService;
+        private readonly HotkeyService? _hotkeyService;
         private DispatcherQueueTimer? _refreshTimer;
 
         // UI更新Channel（批量缓冲翻译条目以减少UI更新频率）
         private readonly Channel<TranslationEntry> _uiTranslationChannel;
         private DispatcherQueueTimer? _batchUpdateTimer;
+
+        // 自动刷新配置的自动保存定时器
+        private DispatcherQueueTimer? _autoRefreshSaveTimer;
+        private bool _isLoadingAutoRefreshConfig = false;
 
         public HomePage()
         {
@@ -47,6 +52,7 @@ namespace XUnity_LLMTranslatePlus.Views
             _translationService = App.GetService<TranslationService>();
             _configService = App.GetService<ConfigService>();
             _logService = App.GetService<LogService>();
+            _hotkeyService = App.GetService<HotkeyService>();
 
             // 订阅事件
             if (_fileMonitorService != null)
@@ -73,6 +79,9 @@ namespace XUnity_LLMTranslatePlus.Views
             // 启动批量更新定时器（每500ms批量处理翻译条目）
             StartBatchUpdateTimer();
 
+            // 初始化自动刷新保存定时器
+            InitializeAutoRefreshSaveTimer();
+
             // 订阅页面卸载事件
             this.Unloaded += HomePage_Unloaded;
         }
@@ -92,6 +101,15 @@ namespace XUnity_LLMTranslatePlus.Views
                 _batchUpdateTimer = null;
             }
 
+            if (_autoRefreshSaveTimer != null)
+            {
+                _autoRefreshSaveTimer.Stop();
+                _autoRefreshSaveTimer = null;
+            }
+
+            // 停止自动刷新
+            _hotkeyService?.StopAutoRefresh();
+
             _uiTranslationChannel.Writer.TryComplete();
         }
 
@@ -99,6 +117,9 @@ namespace XUnity_LLMTranslatePlus.Views
         {
             // 页面加载时同步后台监控状态
             SyncMonitoringState();
+
+            // 加载自动刷新配置（必须在控件完全加载后才能访问）
+            LoadAutoRefreshConfig();
         }
 
         private void SyncMonitoringState()
@@ -125,6 +146,15 @@ namespace XUnity_LLMTranslatePlus.Views
                     FilePathText.Text = filePath;
                     FilePathBorder.Visibility = Visibility.Visible;
                 }
+
+                // 启用自动刷新开关（修复：页面切换后按钮变灰的问题）
+                AutoRefreshToggle.IsEnabled = true;
+
+                // 如果配置中启用了自动刷新但服务未运行，则重新启动
+                if (AutoRefreshToggle.IsOn && _hotkeyService != null && !_hotkeyService.IsRunning)
+                {
+                    _hotkeyService.StartAutoRefresh((int)AutoRefreshIntervalBox.Value, DispatcherQueue);
+                }
             }
             else
             {
@@ -135,6 +165,9 @@ namespace XUnity_LLMTranslatePlus.Views
 
                 // 隐藏文件路径
                 FilePathBorder.Visibility = Visibility.Collapsed;
+
+                // 禁用自动刷新开关
+                AutoRefreshToggle.IsEnabled = false;
             }
 
             // 更新统计信息
@@ -150,6 +183,24 @@ namespace XUnity_LLMTranslatePlus.Views
             }
 
             UpdateStatistics();
+        }
+
+        private void LoadAutoRefreshConfig()
+        {
+            if (_configService == null)
+                return;
+
+            _isLoadingAutoRefreshConfig = true;
+            try
+            {
+                var config = _configService.GetCurrentConfig();
+                AutoRefreshToggle.IsOn = config.EnableAutoRefresh;
+                AutoRefreshIntervalBox.Value = config.AutoRefreshInterval;
+            }
+            finally
+            {
+                _isLoadingAutoRefreshConfig = false;
+            }
         }
 
         private async void StartStopButton_Click(object sender, RoutedEventArgs e)
@@ -210,6 +261,15 @@ namespace XUnity_LLMTranslatePlus.Views
                         FilePathText.Text = e.FilePath;
                         FilePathBorder.Visibility = Visibility.Visible;
                     }
+
+                    // 启用自动刷新开关
+                    AutoRefreshToggle.IsEnabled = true;
+
+                    // 如果配置中启用了自动刷新，则启动
+                    if (AutoRefreshToggle.IsOn && _hotkeyService != null)
+                    {
+                        _hotkeyService.StartAutoRefresh((int)AutoRefreshIntervalBox.Value, DispatcherQueue);
+                    }
                 }
                 else
                 {
@@ -224,6 +284,10 @@ namespace XUnity_LLMTranslatePlus.Views
 
                     // 隐藏文件路径
                     FilePathBorder.Visibility = Visibility.Collapsed;
+
+                    // 禁用自动刷新开关并停止自动刷新
+                    AutoRefreshToggle.IsEnabled = false;
+                    _hotkeyService?.StopAutoRefresh();
                 }
             });
         }
@@ -374,6 +438,109 @@ namespace XUnity_LLMTranslatePlus.Views
             // 批量处理后统一更新一次统计
             UpdateStatistics();
         }
+
+        #region 自动刷新配置
+
+        /// <summary>
+        /// 初始化自动刷新保存定时器
+        /// </summary>
+        private void InitializeAutoRefreshSaveTimer()
+        {
+            _autoRefreshSaveTimer = DispatcherQueue.CreateTimer();
+            _autoRefreshSaveTimer.Interval = TimeSpan.FromMilliseconds(800);
+            _autoRefreshSaveTimer.Tick += (s, e) =>
+            {
+                _autoRefreshSaveTimer?.Stop();
+                _ = SaveAutoRefreshConfigAsync();
+            };
+        }
+
+        /// <summary>
+        /// 触发自动保存（防抖）
+        /// </summary>
+        private void TriggerAutoRefreshSave()
+        {
+            if (_isLoadingAutoRefreshConfig || _configService == null)
+                return;
+
+            _autoRefreshSaveTimer?.Stop();
+            _autoRefreshSaveTimer?.Start();
+        }
+
+        /// <summary>
+        /// 保存自动刷新配置
+        /// </summary>
+        private async System.Threading.Tasks.Task SaveAutoRefreshConfigAsync()
+        {
+            if (_configService == null) return;
+
+            try
+            {
+                // 加载最新配置
+                await _configService.LoadConfigAsync();
+                var config = _configService.GetCurrentConfig();
+
+                // 更新自动刷新配置
+                config.EnableAutoRefresh = AutoRefreshToggle.IsOn;
+                config.AutoRefreshInterval = (int)AutoRefreshIntervalBox.Value;
+
+                // 保存配置
+                await _configService.SaveConfigAsync(config);
+                _logService?.Log("自动刷新配置已保存", LogLevel.Debug);
+            }
+            catch (Exception ex)
+            {
+                _logService?.Log($"保存自动刷新配置失败: {ex.Message}", LogLevel.Error);
+            }
+        }
+
+        /// <summary>
+        /// 自动刷新开关切换事件
+        /// </summary>
+        private void AutoRefreshToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingAutoRefreshConfig)
+                return;
+
+            TriggerAutoRefreshSave();
+
+            // 根据开关状态启动或停止自动刷新
+            if (AutoRefreshToggle.IsOn)
+            {
+                if (_fileMonitorService?.IsMonitoring == true && _hotkeyService != null)
+                {
+                    _hotkeyService.StartAutoRefresh((int)AutoRefreshIntervalBox.Value, DispatcherQueue);
+                }
+            }
+            else
+            {
+                _hotkeyService?.StopAutoRefresh();
+            }
+        }
+
+        /// <summary>
+        /// 自动刷新间隔修改事件
+        /// </summary>
+        private void AutoRefreshIntervalBox_ValueChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+        {
+            if (_isLoadingAutoRefreshConfig)
+                return;
+
+            // 验证范围
+            if (args.NewValue < 1 || args.NewValue > 60)
+                return;
+
+            TriggerAutoRefreshSave();
+
+            // 如果自动刷新正在运行，重启以应用新间隔
+            if (AutoRefreshToggle.IsOn && _hotkeyService?.IsRunning == true)
+            {
+                _hotkeyService.StopAutoRefresh();
+                _hotkeyService.StartAutoRefresh((int)args.NewValue, DispatcherQueue);
+            }
+        }
+
+        #endregion
     }
 }
 
