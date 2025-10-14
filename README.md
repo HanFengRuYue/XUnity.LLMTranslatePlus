@@ -146,5 +146,3 @@ MIT License
 ## 相关项目
 
 - [XUnity.AutoTranslator](https://github.com/bbepis/XUnity.AutoTranslator) - Unity游戏自动翻译框架
-
----
