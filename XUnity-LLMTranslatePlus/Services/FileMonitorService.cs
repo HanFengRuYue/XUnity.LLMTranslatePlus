@@ -18,6 +18,7 @@ namespace XUnity_LLMTranslatePlus.Services
         private readonly TranslationService _translationService;
         private readonly LogService _logService;
         private readonly ConfigService _configService;
+        private readonly ApiPoolManager? _apiPoolManager;
 
         private FileSystemWatcher? _fileWatcher;
         private TextFileParser? _parser;
@@ -66,11 +67,13 @@ namespace XUnity_LLMTranslatePlus.Services
         public FileMonitorService(
             TranslationService translationService,
             LogService logService,
-            ConfigService configService)
+            ConfigService configService,
+            ApiPoolManager? apiPoolManager = null)
         {
             _translationService = translationService;
             _logService = logService;
             _configService = configService;
+            _apiPoolManager = apiPoolManager;
 
             // 初始化批量写入队列
             _writeQueue = Channel.CreateUnbounded<Dictionary<string, string>>(new UnboundedChannelOptions
@@ -172,6 +175,12 @@ namespace XUnity_LLMTranslatePlus.Services
                     _isMonitoring = true;
                 }
 
+                // 初始化 API 池（在启动消费者前，防止并发初始化冲突）
+                if (_apiPoolManager != null)
+                {
+                    await _apiPoolManager.EnsureInitializedAsync(_cancellationTokenSource.Token);
+                }
+
                 // 启动消费者任务池（持续并发翻译）
                 StartConsumerTasks(_configService.GetCurrentConfig());
 
@@ -263,6 +272,19 @@ namespace XUnity_LLMTranslatePlus.Services
             // 释放取消标记源
             _cancellationTokenSource?.Dispose();
             _cancellationTokenSource = null;
+
+            // 重置 API 池初始化状态（下次启动时重新初始化）
+            if (_apiPoolManager != null)
+            {
+                try
+                {
+                    await _apiPoolManager.ResetAsync();
+                }
+                catch (Exception ex)
+                {
+                    await _logService.LogAsync($"重置API池失败: {ex.Message}", LogLevel.Warning);
+                }
+            }
 
             _parser?.Clear();
             _parser = null;
@@ -428,8 +450,18 @@ namespace XUnity_LLMTranslatePlus.Services
         {
             _consumerTasks = new List<Task>();
 
-            // 创建固定数量的消费者任务
-            int consumerCount = config.MaxConcurrentTranslations;
+            // 从所有启用的API端点计算总并发容量
+            var enabledEndpoints = config.ApiEndpoints.Where(e => e.IsEnabled).ToList();
+            int totalConcurrent = enabledEndpoints.Sum(e => e.MaxConcurrent);
+            int consumerCount = Math.Min(totalConcurrent, 100); // 上限100，防止过度消耗资源
+
+            // 如果没有启用的端点或并发数为0，使用默认值3
+            if (consumerCount == 0)
+            {
+                consumerCount = 3;
+                _logService.Log("未配置启用的API端点，使用默认并发数: 3", LogLevel.Warning);
+            }
+
             for (int i = 0; i < consumerCount; i++)
             {
                 int consumerId = i + 1;
@@ -437,7 +469,7 @@ namespace XUnity_LLMTranslatePlus.Services
                 _consumerTasks.Add(task);
             }
 
-            _logService.Log($"已启动 {consumerCount} 个并发翻译任务", LogLevel.Info);
+            _logService.Log($"已启动 {consumerCount} 个并发翻译任务（基于 {enabledEndpoints.Count} 个API端点）", LogLevel.Info);
         }
 
         /// <summary>

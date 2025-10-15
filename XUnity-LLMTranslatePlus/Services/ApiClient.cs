@@ -105,19 +105,44 @@ namespace XUnity_LLMTranslatePlus.Services
         }
 
         /// <summary>
-        /// 翻译文本
+        /// 翻译文本（使用 ApiEndpoint 配置）
         /// </summary>
-        public async Task<string> TranslateAsync(string text, string systemPrompt, AppConfig config, CancellationToken cancellationToken = default)
+        public async Task<string> TranslateAsync(string text, string systemPrompt, ApiEndpoint endpoint, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
                 return text;
             }
 
-            int retryCount = 0;
+            if (endpoint == null)
+            {
+                throw new ArgumentNullException(nameof(endpoint));
+            }
+
+            return await TranslateInternalAsync(
+                text, systemPrompt,
+                endpoint.Url, endpoint.ApiKey, endpoint.ModelName,
+                endpoint.MaxTokens, endpoint.Temperature, endpoint.TopP,
+                endpoint.FrequencyPenalty, endpoint.PresencePenalty,
+                endpoint.Timeout, 3, // 使用固定重试次数3次
+                cancellationToken);
+        }
+
+        /// <summary>
+        /// 内部翻译实现（统一逻辑）
+        /// </summary>
+        private async Task<string> TranslateInternalAsync(
+            string text, string systemPrompt,
+            string apiUrl, string apiKey, string modelName,
+            int maxTokens, double temperature, double topP,
+            double frequencyPenalty, double presencePenalty,
+            int timeout, int retryCount,
+            CancellationToken cancellationToken)
+        {
+            int currentRetry = 0;
             Exception? lastException = null;
 
-            while (retryCount <= config.RetryCount)
+            while (currentRetry <= retryCount)
             {
                 // 检查外部取消请求
                 cancellationToken.ThrowIfCancellationRequested();
@@ -127,17 +152,17 @@ namespace XUnity_LLMTranslatePlus.Services
                     // 构建请求
                     var request = new OpenAIRequest
                     {
-                        Model = config.ModelName,
+                        Model = modelName,
                         Messages = new[]
                         {
                             new Message { Role = "system", Content = systemPrompt },
                             new Message { Role = "user", Content = text }
                         },
-                        MaxTokens = config.MaxTokens,
-                        Temperature = config.Temperature,
-                        TopP = config.TopP,
-                        FrequencyPenalty = config.FrequencyPenalty,
-                        PresencePenalty = config.PresencePenalty
+                        MaxTokens = maxTokens,
+                        Temperature = temperature,
+                        TopP = topP,
+                        FrequencyPenalty = frequencyPenalty,
+                        PresencePenalty = presencePenalty
                     };
 
                     var jsonOptions = new JsonSerializerOptions
@@ -148,25 +173,25 @@ namespace XUnity_LLMTranslatePlus.Services
                     string requestJson = JsonSerializer.Serialize(request, jsonOptions);
 
                     // 发送请求
-                    var httpRequest = new HttpRequestMessage(HttpMethod.Post, config.ApiUrl)
+                    var httpRequest = new HttpRequestMessage(HttpMethod.Post, apiUrl)
                     {
                         Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
                     };
 
                     // 添加 Authorization 头
-                    if (!string.IsNullOrWhiteSpace(config.ApiKey))
+                    if (!string.IsNullOrWhiteSpace(apiKey))
                     {
-                        httpRequest.Headers.Add("Authorization", $"Bearer {config.ApiKey}");
+                        httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
                     }
 
-                    await _logService.LogAsync($"发送翻译请求 (尝试 {retryCount + 1}/{config.RetryCount + 1})", LogLevel.Debug);
+                    await _logService.LogAsync($"发送翻译请求 (尝试 {currentRetry + 1}/{retryCount + 1})", LogLevel.Debug);
 
                     // 创建链接的取消令牌：结合外部取消和超时取消
-                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(config.Timeout));
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(timeout));
                     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
 
                     using var httpClient = _httpClientFactory.CreateClient();
-                    httpClient.Timeout = TimeSpan.FromSeconds(config.Timeout + 5); // 额外5秒以避免双重超时
+                    httpClient.Timeout = TimeSpan.FromSeconds(timeout + 5); // 额外5秒以避免双重超时
                     var httpResponse = await httpClient.SendAsync(httpRequest, linkedCts.Token);
                     string responseJson = await httpResponse.Content.ReadAsStringAsync();
 
@@ -175,7 +200,7 @@ namespace XUnity_LLMTranslatePlus.Services
                         await _logService.LogAsync($"API 请求失败: {httpResponse.StatusCode} - {responseJson}", LogLevel.Error);
                         throw new ApiConnectionException(
                             $"API 请求失败: {httpResponse.StatusCode}",
-                            config.ApiUrl,
+                            apiUrl,
                             (int)httpResponse.StatusCode);
                     }
 
@@ -213,19 +238,19 @@ namespace XUnity_LLMTranslatePlus.Services
                 {
                     // TaskCanceledException也会被这里捕获，因为它是OperationCanceledException的子类
                     lastException = new TranslationTimeoutException(
-                        $"请求超时 ({config.Timeout}秒)",
-                        config.Timeout,
-                        retryCount);
-                    await _logService.LogAsync($"翻译请求超时 (尝试 {retryCount + 1}/{config.RetryCount + 1})", LogLevel.Warning);
+                        $"请求超时 ({timeout}秒)",
+                        timeout,
+                        currentRetry);
+                    await _logService.LogAsync($"翻译请求超时 (尝试 {currentRetry + 1}/{retryCount + 1})", LogLevel.Warning);
                 }
                 catch (HttpRequestException ex)
                 {
                     // 网络连接错误
                     lastException = new ApiConnectionException(
                         $"网络连接失败: {ex.Message}",
-                        config.ApiUrl,
+                        apiUrl,
                         ex);
-                    await _logService.LogAsync($"网络连接失败: {ex.Message} (尝试 {retryCount + 1}/{config.RetryCount + 1})", LogLevel.Warning);
+                    await _logService.LogAsync($"网络连接失败: {ex.Message} (尝试 {currentRetry + 1}/{retryCount + 1})", LogLevel.Warning);
                 }
                 catch (JsonException ex)
                 {
@@ -233,7 +258,7 @@ namespace XUnity_LLMTranslatePlus.Services
                     lastException = new ApiResponseException(
                         $"API 响应解析失败: {ex.Message}",
                         ex);
-                    await _logService.LogAsync($"API 响应解析失败: {ex.Message} (尝试 {retryCount + 1}/{config.RetryCount + 1})", LogLevel.Warning);
+                    await _logService.LogAsync($"API 响应解析失败: {ex.Message} (尝试 {currentRetry + 1}/{retryCount + 1})", LogLevel.Warning);
                 }
                 catch (TranslationException)
                 {
@@ -243,15 +268,15 @@ namespace XUnity_LLMTranslatePlus.Services
                 catch (Exception ex)
                 {
                     lastException = ex;
-                    await _logService.LogAsync($"翻译失败: {ex.Message} (尝试 {retryCount + 1}/{config.RetryCount + 1})", LogLevel.Warning);
+                    await _logService.LogAsync($"翻译失败: {ex.Message} (尝试 {currentRetry + 1}/{retryCount + 1})", LogLevel.Warning);
                 }
 
-                retryCount++;
+                currentRetry++;
 
                 // 如果还有重试次数，等待一段时间后重试
-                if (retryCount <= config.RetryCount)
+                if (currentRetry <= retryCount)
                 {
-                    await Task.Delay(2000 * retryCount, cancellationToken); // 递增延迟，支持取消
+                    await Task.Delay(2000 * currentRetry, cancellationToken); // 递增延迟，支持取消
                 }
             }
 
@@ -268,32 +293,45 @@ namespace XUnity_LLMTranslatePlus.Services
             // 如果lastException为null，抛出不带内部异常的TranslationException
             if (lastException == null)
             {
-                throw new TranslationException($"翻译失败 (已重试 {config.RetryCount} 次): {errorMessage}");
+                throw new TranslationException($"翻译失败 (已重试 {retryCount} 次): {errorMessage}");
             }
 
             throw new TranslationException(
-                $"翻译失败 (已重试 {config.RetryCount} 次): {errorMessage}",
+                $"翻译失败 (已重试 {retryCount} 次): {errorMessage}",
                 lastException);
         }
 
         /// <summary>
-        /// 获取可用模型列表
+        /// 获取可用模型列表（使用 ApiEndpoint 配置）
         /// </summary>
-        public async Task<List<string>> GetModelsAsync(AppConfig config, CancellationToken cancellationToken = default)
+        public async Task<List<string>> GetModelsAsync(ApiEndpoint endpoint, CancellationToken cancellationToken = default)
+        {
+            if (endpoint == null)
+            {
+                throw new ArgumentNullException(nameof(endpoint));
+            }
+
+            return await GetModelsInternalAsync(endpoint.Url, endpoint.ApiKey, cancellationToken);
+        }
+
+        /// <summary>
+        /// 内部获取模型列表实现（统一逻辑）
+        /// </summary>
+        private async Task<List<string>> GetModelsInternalAsync(string apiUrl, string apiKey, CancellationToken cancellationToken)
         {
             try
             {
                 await _logService.LogAsync("正在获取模型列表...", LogLevel.Info);
 
                 // 构建模型列表API URL
-                string modelsUrl = GetModelsApiUrl(config.ApiUrl);
+                string modelsUrl = GetModelsApiUrl(apiUrl);
 
                 var httpRequest = new HttpRequestMessage(HttpMethod.Get, modelsUrl);
 
                 // 添加 Authorization 头
-                if (!string.IsNullOrWhiteSpace(config.ApiKey))
+                if (!string.IsNullOrWhiteSpace(apiKey))
                 {
-                    httpRequest.Headers.Add("Authorization", $"Bearer {config.ApiKey}");
+                    httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
                 }
 
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -348,30 +386,6 @@ namespace XUnity_LLMTranslatePlus.Services
             
             // 默认返回OpenAI格式
             return "https://api.openai.com/v1/models";
-        }
-
-        /// <summary>
-        /// 测试 API 连接
-        /// </summary>
-        public async Task<bool> TestConnectionAsync(AppConfig config, CancellationToken cancellationToken = default)
-        {
-            try
-            {
-                await _logService.LogAsync("正在测试 API 连接...", LogLevel.Info);
-
-                string testText = "Hello";
-                string testPrompt = "Translate to Chinese: ";
-
-                await TranslateAsync(testText, testPrompt, config, cancellationToken);
-
-                await _logService.LogAsync("API 连接测试成功", LogLevel.Info);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                await _logService.LogAsync($"API 连接测试失败: {ex.Message}", LogLevel.Error);
-                return false;
-            }
         }
 
         /// <summary>

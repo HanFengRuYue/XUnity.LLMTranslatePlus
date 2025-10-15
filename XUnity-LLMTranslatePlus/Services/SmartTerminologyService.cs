@@ -18,6 +18,7 @@ namespace XUnity_LLMTranslatePlus.Services
         private readonly TerminologyService _terminologyService;
         private readonly ConfigService _configService;
         private readonly LogService _logService;
+        private readonly TranslationDispatcher? _translationDispatcher;
         private readonly HashSet<string> _processedTexts = new HashSet<string>();
         private readonly object _processedLock = new object();
 
@@ -41,12 +42,14 @@ namespace XUnity_LLMTranslatePlus.Services
             ApiClient apiClient,
             TerminologyService terminologyService,
             ConfigService configService,
-            LogService logService)
+            LogService logService,
+            TranslationDispatcher? translationDispatcher = null)
         {
             _apiClient = apiClient;
             _terminologyService = terminologyService;
             _configService = configService;
             _logService = logService;
+            _translationDispatcher = translationDispatcher;
         }
 
         /// <summary>
@@ -83,12 +86,39 @@ namespace XUnity_LLMTranslatePlus.Services
 
                 await _logService.LogAsync($"[智能术语] 开始提取: {originalText}", LogLevel.Debug);
 
-                // 调用 API 提取术语
-                string response = await _apiClient.TranslateAsync(
-                    extractionPrompt,
-                    "你是一个专业的术语提取助手。",
-                    config,
-                    cancellationToken);
+                // 使用 TranslationDispatcher 进行多端点负载均衡调用
+                string response;
+
+                if (_translationDispatcher != null && config.ApiEndpoints != null && config.ApiEndpoints.Count > 0)
+                {
+                    // 使用多端点负载均衡模式（支持失败重试）
+                    await _logService.LogAsync(
+                        $"[智能术语] 使用多端点负载均衡模式 ({config.ApiEndpoints.Count(e => e.IsEnabled)}个可用端点)",
+                        LogLevel.Debug);
+
+                    response = await _translationDispatcher.DispatchTranslationAsync(
+                        extractionPrompt,
+                        "你是一个专业的术语提取助手。",
+                        config,
+                        cancellationToken);
+                }
+                else
+                {
+                    // 降级方案：使用单端点模式（向后兼容）
+                    var endpoint = config.ApiEndpoints?.FirstOrDefault(e => e.IsEnabled);
+                    if (endpoint == null)
+                    {
+                        await _logService.LogAsync("[智能术语] 没有可用的 API 端点", LogLevel.Warning);
+                        return;
+                    }
+
+                    await _logService.LogAsync($"[智能术语] 使用单端点模式: {endpoint.Name}", LogLevel.Debug);
+                    response = await _apiClient.TranslateAsync(
+                        extractionPrompt,
+                        "你是一个专业的术语提取助手。",
+                        endpoint,
+                        cancellationToken);
+                }
 
                 await _logService.LogAsync($"[智能术语] API 响应: {response}", LogLevel.Debug);
 

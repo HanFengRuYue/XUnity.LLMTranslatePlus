@@ -201,28 +201,6 @@ namespace XUnity_LLMTranslatePlus.Services
         }
 
         /// <summary>
-        /// 写入日志到文件（废弃，现在使用批量处理）
-        /// </summary>
-        [Obsolete("This method is deprecated. Logs are now processed in batches.")]
-        private async Task WriteLogToFileAsync(LogEntry logEntry)
-        {
-            try
-            {
-                string logFileName = $"log_{DateTime.Now:yyyyMMdd}.txt";
-                string logFilePath = Path.Combine(LogFolder, logFileName);
-
-                string logLine = $"[{logEntry.Timestamp}] [{logEntry.Level}] {logEntry.Message}{Environment.NewLine}";
-
-                await File.AppendAllTextAsync(logFilePath, logLine);
-            }
-            catch (Exception ex)
-            {
-                // 写入日志失败，避免递归
-                Console.WriteLine($"写入日志失败: {ex.Message}");
-            }
-        }
-
-        /// <summary>
         /// 获取最近的日志
         /// </summary>
         public List<LogEntry> GetRecentLogs()

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace XUnity_LLMTranslatePlus.Models
@@ -7,12 +8,10 @@ namespace XUnity_LLMTranslatePlus.Models
     /// </summary>
     public class AppConfig
     {
-        // API 基础配置
-        public string ApiPlatform { get; set; } = "OpenAI";
-        public string ApiFormat { get; set; } = "OpenAI"; // API请求格式：OpenAI, Claude, Gemini等
-        public string ApiUrl { get; set; } = "https://api.openai.com/v1/chat/completions";
-        public string ApiKey { get; set; } = "";
-        public string ModelName { get; set; } = "gpt-3.5-turbo";
+        /// <summary>
+        /// API端点列表（用于负载均衡）
+        /// </summary>
+        public List<ApiEndpoint> ApiEndpoints { get; set; } = new List<ApiEndpoint>();
 
         // API 高级配置
         public int MaxTokens { get; set; } = 4096;
@@ -22,9 +21,6 @@ namespace XUnity_LLMTranslatePlus.Models
         public double PresencePenalty { get; set; } = 0.0;
         public int Timeout { get; set; } = 30;
         public int RetryCount { get; set; } = 3;
-
-        // 并发配置
-        public int MaxConcurrentTranslations { get; set; } = 3;
 
         // 系统提示词
         public string SystemPrompt { get; set; } = "你是一个专业的游戏文本翻译助手。请将以下文本翻译成{目标语言}。保持原文的语气和风格，确保翻译准确、流畅、自然。\n\n【重要】如果文本中包含形如【SPECIAL_数字】的占位符，请务必在译文中完整保留这些占位符，不要翻译或修改它们。\n\n原文：{原文}\n\n术语参考：{术语}\n\n上下文参考：{上下文}\n\n请只输出翻译结果，不要包含任何解释或额外内容。";

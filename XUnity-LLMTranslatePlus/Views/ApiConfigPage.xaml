@@ -4,212 +4,144 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:XUnity_LLMTranslatePlus.Views"
+    xmlns:models="using:XUnity_LLMTranslatePlus.Models"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+    mc:Ignorable="d"
+    Loaded="Page_Loaded">
 
     <ScrollViewer Padding="0,0,16,0" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="16" Margin="0,0,0,24" HorizontalAlignment="Stretch">
             <!-- 页面标题 -->
             <TextBlock Text="API 配置" Style="{StaticResource TitleTextBlockStyle}"/>
 
-            <!-- 基础配置 -->
-            <Expander Header="基础配置" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-                <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
-                    <!-- API 平台 -->
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="API 平台"/>
-                        <ComboBox x:Name="ApiPlatformComboBox" 
-                                  SelectedIndex="0" 
-                                  HorizontalAlignment="Stretch"
-                                  SelectionChanged="ApiPlatformComboBox_SelectionChanged">
-                            <ComboBoxItem Content="OpenAI"/>
-                            <ComboBoxItem Content="Azure OpenAI"/>
-                            <ComboBoxItem Content="Anthropic Claude"/>
-                            <ComboBoxItem Content="Google Gemini"/>
-                            <ComboBoxItem Content="DeepSeek"/>
-                            <ComboBoxItem Content="Moonshot"/>
-                            <ComboBoxItem Content="智谱GLM"/>
-                            <ComboBoxItem Content="Ollama"/>
-                            <ComboBoxItem Content="自定义"/>
-                        </ComboBox>
-                    </StackPanel>
+            <InfoBar Severity="Informational"
+                     IsOpen="True"
+                     IsClosable="False"
+                     Message="系统使用多API端点智能负载均衡，快速API自动处理更多任务"/>
 
-                    <!-- API 地址 -->
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="API 地址"/>
-                        <TextBox x:Name="ApiUrlTextBox"
-                                 PlaceholderText="https://api.openai.com/v1/chat/completions"
-                                 Text="https://api.openai.com/v1/chat/completions"
-                                 HorizontalAlignment="Stretch"
-                                 TextChanged="ApiUrlTextBox_TextChanged"/>
-                    </StackPanel>
-
-                    <!-- API 密钥 -->
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="API 密钥"/>
-                        <PasswordBox x:Name="ApiKeyPasswordBox"
-                                     PlaceholderText="输入您的 API 密钥"
-                                     HorizontalAlignment="Stretch"
-                                     PasswordChanged="ApiKeyPasswordBox_PasswordChanged"/>
-                    </StackPanel>
-
-                    <!-- 模型名称 -->
-                    <StackPanel Spacing="4">
-                        <Grid>
-                            <TextBlock Text="模型名称" HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                            <Button x:Name="RefreshModelsButton" 
-                                    Content="刷新列表" 
-                                    HorizontalAlignment="Right"
-                                    Click="RefreshModelsButton_Click"
-                                    FontSize="12"
-                                    Padding="8,4">
-                                <Button.Resources>
-                                    <ResourceDictionary>
-                                        <Thickness x:Key="ButtonPadding">8,4</Thickness>
-                                    </ResourceDictionary>
-                                </Button.Resources>
+            <!-- API端点列表 -->
+            <Expander x:Name="EndpointsExpander"
+                      Header="API端点管理"
+                      IsExpanded="True"
+                      HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Stretch">
+                <StackPanel Spacing="12" Margin="0,12,0,0">
+                    <!-- 工具栏 -->
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                            <Button Click="AddEndpointButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                                    <TextBlock Text="添加API"/>
+                                </StackPanel>
                             </Button>
-                        </Grid>
-                        <ComboBox x:Name="ModelNameComboBox"
-                                  IsEditable="True"
-                                  HorizontalAlignment="Stretch"
-                                  TextSubmitted="ModelNameComboBox_TextSubmitted">
-                            <ComboBoxItem Content="gpt-3.5-turbo"/>
-                            <ComboBoxItem Content="gpt-4"/>
-                            <ComboBoxItem Content="gpt-4-turbo"/>
-                            <ComboBoxItem Content="claude-3-sonnet"/>
-                            <ComboBoxItem Content="gemini-pro"/>
-                        </ComboBox>
-                    </StackPanel>
-
-                    <!-- 测试连接按钮 -->
-                    <Button Style="{StaticResource AccentButtonStyle}"
-                            Click="TestConnectionButton_Click">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE895;" FontSize="16"/>
-                            <TextBlock Text="测试连接"/>
+                            <Button Click="TestAllButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xE895;" FontSize="14"/>
+                                    <TextBlock Text="全部测试"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Click="RefreshStatsButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xE72C;" FontSize="14"/>
+                                    <TextBlock Text="刷新统计"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Expander>
 
-            <!-- 高级配置 -->
-            <Expander Header="高级配置" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-                <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
-                    <!-- 最大令牌数 -->
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="最大令牌数"/>
-                        <NumberBox x:Name="MaxTokensNumberBox"
-                                   Value="4096"
-                                   Minimum="1"
-                                   Maximum="32000"
-                                   SpinButtonPlacementMode="Inline"
-                                   ValueChanged="MaxTokensNumberBox_ValueChanged"/>
-                    </StackPanel>
+                        <TextBlock x:Name="EndpointCountText"
+                                   Text="共 0 个端点"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   FontSize="12"
+                                   Foreground="Gray"/>
+                    </Grid>
 
-                    <!-- 温度 -->
-                    <StackPanel Spacing="4">
-                        <Grid>
-                            <TextBlock Text="温度" HorizontalAlignment="Left"/>
-                            <TextBlock x:Name="TemperatureValueText" 
-                                       Text="0.7" 
-                                       HorizontalAlignment="Right"/>
-                        </Grid>
-                        <Slider x:Name="TemperatureSlider" 
-                                Minimum="0" 
-                                Maximum="2" 
-                                StepFrequency="0.1" 
-                                Value="0.7"
-                                ValueChanged="TemperatureSlider_ValueChanged"/>
-                    </StackPanel>
+                    <!-- 端点列表 -->
+                    <ListView x:Name="EndpointsListView"
+                              SelectionMode="None"
+                              MaxHeight="500"
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                              BorderThickness="1"
+                              CornerRadius="8">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="12" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
 
-                    <!-- Top P -->
-                    <StackPanel Spacing="4">
-                        <Grid>
-                            <TextBlock Text="Top P" HorizontalAlignment="Left"/>
-                            <TextBlock x:Name="TopPValueText" 
-                                       Text="1.0" 
-                                       HorizontalAlignment="Right"/>
-                        </Grid>
-                        <Slider x:Name="TopPSlider" 
-                                Minimum="0" 
-                                Maximum="1" 
-                                StepFrequency="0.1" 
-                                Value="1.0"
-                                ValueChanged="TopPSlider_ValueChanged"/>
-                    </StackPanel>
+                                    <!-- 启用开关 -->
+                                    <ToggleSwitch Grid.Column="0"
+                                                  IsOn="{Binding IsEnabled, Mode=TwoWay}"
+                                                  MinWidth="0"
+                                                  OffContent=""
+                                                  OnContent=""
+                                                  Toggled="EndpointToggle_Toggled"/>
 
-                    <!-- 频率惩罚 -->
-                    <StackPanel Spacing="4">
-                        <Grid>
-                            <TextBlock Text="频率惩罚" HorizontalAlignment="Left"/>
-                            <TextBlock x:Name="FrequencyPenaltyValueText" 
-                                       Text="0.0" 
-                                       HorizontalAlignment="Right"/>
-                        </Grid>
-                        <Slider x:Name="FrequencyPenaltySlider" 
-                                Minimum="-2" 
-                                Maximum="2" 
-                                StepFrequency="0.1" 
-                                Value="0.0"
-                                ValueChanged="FrequencyPenaltySlider_ValueChanged"/>
-                    </StackPanel>
+                                    <!-- 端点信息 -->
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                        <TextBlock FontSize="12" Foreground="Gray">
+                                            <Run Text="平台:"/>
+                                            <Run Text="{Binding Platform}"/>
+                                            <Run Text=" | 模型:"/>
+                                            <Run Text="{Binding ModelName}"/>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Url}"
+                                                   FontSize="11"
+                                                   Foreground="Gray"
+                                                   TextTrimming="CharacterEllipsis"/>
 
-                    <!-- 存在惩罚 -->
-                    <StackPanel Spacing="4">
-                        <Grid>
-                            <TextBlock Text="存在惩罚" HorizontalAlignment="Left"/>
-                            <TextBlock x:Name="PresencePenaltyValueText" 
-                                       Text="0.0" 
-                                       HorizontalAlignment="Right"/>
-                        </Grid>
-                        <Slider x:Name="PresencePenaltySlider" 
-                                Minimum="-2" 
-                                Maximum="2" 
-                                StepFrequency="0.1" 
-                                Value="0.0"
-                                ValueChanged="PresencePenaltySlider_ValueChanged"/>
-                    </StackPanel>
+                                        <!-- 统计信息占位符 -->
+                                        <TextBlock x:Name="StatsText"
+                                                   FontSize="11"
+                                                   Foreground="Green"
+                                                   Text="等待统计数据..."
+                                                   Tag="{Binding Id}"/>
+                                    </StackPanel>
 
-                    <!-- 超时时间 -->
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="超时时间（秒）"/>
-                        <NumberBox x:Name="TimeoutNumberBox"
-                                   Value="30"
-                                   Minimum="5"
-                                   Maximum="300"
-                                   SpinButtonPlacementMode="Inline"
-                                   ValueChanged="TimeoutNumberBox_ValueChanged"/>
-                    </StackPanel>
+                                    <!-- 操作按钮 -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                                        <Button Content="编辑"
+                                                Click="EditEndpointButton_Click"
+                                                Tag="{Binding Id}"
+                                                Style="{StaticResource AccentButtonStyle}"
+                                                Padding="8,4"/>
+                                        <Button Content="测试"
+                                                Click="TestEndpointButton_Click"
+                                                Tag="{Binding Id}"
+                                                Padding="8,4"/>
+                                        <Button Content="删除"
+                                                Click="DeleteEndpointButton_Click"
+                                                Tag="{Binding Id}"
+                                                Padding="8,4"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
 
-                    <!-- 重试次数 -->
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="重试次数"/>
-                        <NumberBox x:Name="RetryCountNumberBox"
-                                   Value="3"
-                                   Minimum="1"
-                                   Maximum="10"
-                                   SpinButtonPlacementMode="Inline"
-                                   ValueChanged="RetryCountNumberBox_ValueChanged"/>
-                    </StackPanel>
-                </StackPanel>
-            </Expander>
-
-            <!-- 并发配置 -->
-            <Expander Header="并发配置" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
-                <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
-                    <!-- 最大并发翻译数 -->
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="最大并发翻译数"
-                                   ToolTipService.ToolTip="同时发送给API翻译的文本数量，建议根据API速率限制调整"/>
-                        <NumberBox x:Name="MaxConcurrentTranslationsNumberBox"
-                                   Value="3"
-                                   Minimum="1"
-                                   Maximum="100"
-                                   SpinButtonPlacementMode="Inline"
-                                   ValueChanged="MaxConcurrentTranslationsNumberBox_ValueChanged"/>
-                    </StackPanel>
+                    <!-- 空状态提示 -->
+                    <Border x:Name="EmptyStateBorder"
+                            Visibility="Collapsed"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="24"
+                            Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <StackPanel Spacing="8" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE946;" FontSize="48" Foreground="Gray"/>
+                            <TextBlock Text="还没有API端点" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="点击上方【添加API】按钮创建第一个端点"
+                                       FontSize="12"
+                                       Foreground="Gray"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Expander>
 
@@ -217,8 +149,7 @@
             <InfoBar Severity="Informational"
                      IsOpen="True"
                      IsClosable="False"
-                     Message="所有设置更改将自动保存"/>
+                     Message="所有配置更改将自动保存"/>
         </StackPanel>
     </ScrollViewer>
 </Page>
-

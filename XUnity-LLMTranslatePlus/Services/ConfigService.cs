@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -61,18 +63,25 @@ namespace XUnity_LLMTranslatePlus.Services
 
                     if (config != null)
                     {
-                        // 解密 API Key（如果已加密）
-                        if (!string.IsNullOrEmpty(config.ApiKey))
+                        // 解密所有API端点的密钥
+                        if (config.ApiEndpoints != null)
                         {
-                            try
+                            foreach (var endpoint in config.ApiEndpoints)
                             {
-                                config.ApiKey = SecureDataProtection.Unprotect(config.ApiKey);
-                            }
-                            catch
-                            {
-                                // 如果解密失败，可能是旧格式的明文，保持原样
+                                if (!string.IsNullOrEmpty(endpoint.ApiKey))
+                                {
+                                    try
+                                    {
+                                        endpoint.ApiKey = SecureDataProtection.Unprotect(endpoint.ApiKey);
+                                    }
+                                    catch
+                                    {
+                                        // 解密失败，保持原样
+                                    }
+                                }
                             }
                         }
+
                         _currentConfig = config;
                     }
                     else
@@ -109,20 +118,47 @@ namespace XUnity_LLMTranslatePlus.Services
         }
 
         /// <summary>
+        /// 复制配置用于保存
+        /// </summary>
+        private AppConfig CopyConfigForSave(AppConfig config)
+        {
+            return new AppConfig
+            {
+                ApiEndpoints = config.ApiEndpoints?.Select(e => e.Clone()).ToList() ?? new List<ApiEndpoint>(),
+                MaxTokens = config.MaxTokens,
+                Temperature = config.Temperature,
+                TopP = config.TopP,
+                FrequencyPenalty = config.FrequencyPenalty,
+                PresencePenalty = config.PresencePenalty,
+                Timeout = config.Timeout,
+                RetryCount = config.RetryCount,
+                SystemPrompt = config.SystemPrompt,
+                TermsDatabase = config.TermsDatabase,
+                TermsFilePath = config.TermsFilePath,
+                GameDirectory = config.GameDirectory,
+                AutoDetectPath = config.AutoDetectPath,
+                ManualTranslationFilePath = config.ManualTranslationFilePath,
+                TargetLanguage = config.TargetLanguage,
+                SourceLanguage = config.SourceLanguage,
+                PreserveSpecialChars = config.PreserveSpecialChars,
+                RealTimeMonitoring = config.RealTimeMonitoring,
+                EnableContext = config.EnableContext,
+                ContextLines = config.ContextLines,
+                EnableCache = config.EnableCache,
+                ExportLog = config.ExportLog,
+                ErrorThreshold = config.ErrorThreshold,
+                EnableAutoRefresh = config.EnableAutoRefresh,
+                AutoRefreshInterval = config.AutoRefreshInterval,
+                EnableSmartTerminology = config.EnableSmartTerminology,
+                CurrentTerminologyFile = config.CurrentTerminologyFile
+            };
+        }
+
+        /// <summary>
         /// 验证配置有效性
         /// </summary>
         private void ValidateConfig(AppConfig config)
         {
-            if (string.IsNullOrWhiteSpace(config.ApiUrl))
-            {
-                throw new ConfigurationValidationException("API URL 不能为空", nameof(config.ApiUrl));
-            }
-
-            if (!Uri.TryCreate(config.ApiUrl, UriKind.Absolute, out _))
-            {
-                throw new ConfigurationValidationException($"API URL 格式无效: {config.ApiUrl}", nameof(config.ApiUrl));
-            }
-
             if (config.MaxTokens <= 0 || config.MaxTokens > 128000)
             {
                 throw new ConfigurationValidationException($"最大Token数必须在1到128000之间，当前值: {config.MaxTokens}", nameof(config.MaxTokens));
@@ -158,11 +194,6 @@ namespace XUnity_LLMTranslatePlus.Services
                 throw new ConfigurationValidationException($"重试次数必须在0到10之间，当前值: {config.RetryCount}", nameof(config.RetryCount));
             }
 
-            if (config.MaxConcurrentTranslations <= 0 || config.MaxConcurrentTranslations > 100)
-            {
-                throw new ConfigurationValidationException($"最大并发数必须在1到100之间，当前值: {config.MaxConcurrentTranslations}", nameof(config.MaxConcurrentTranslations));
-            }
-
             if (string.IsNullOrWhiteSpace(config.SystemPrompt))
             {
                 throw new ConfigurationValidationException("系统提示词不能为空", nameof(config.SystemPrompt));
@@ -196,56 +227,27 @@ namespace XUnity_LLMTranslatePlus.Services
             try
             {
                 // 创建配置副本用于保存（不修改原始对象）
-                var configToSave = new AppConfig
-                {
-                    ApiPlatform = config.ApiPlatform,
-                    ApiFormat = config.ApiFormat,
-                    ApiUrl = config.ApiUrl,
-                    ApiKey = config.ApiKey, // 稍后加密
-                    ModelName = config.ModelName,
-                    MaxTokens = config.MaxTokens,
-                    Temperature = config.Temperature,
-                    TopP = config.TopP,
-                    FrequencyPenalty = config.FrequencyPenalty,
-                    PresencePenalty = config.PresencePenalty,
-                    Timeout = config.Timeout,
-                    RetryCount = config.RetryCount,
-                    MaxConcurrentTranslations = config.MaxConcurrentTranslations,
-                    SystemPrompt = config.SystemPrompt,
-                    TermsDatabase = config.TermsDatabase,
-                    TermsFilePath = config.TermsFilePath,
-                    GameDirectory = config.GameDirectory,
-                    AutoDetectPath = config.AutoDetectPath,
-                    ManualTranslationFilePath = config.ManualTranslationFilePath,
-                    TargetLanguage = config.TargetLanguage,
-                    SourceLanguage = config.SourceLanguage,
-                    PreserveSpecialChars = config.PreserveSpecialChars,
-                    RealTimeMonitoring = config.RealTimeMonitoring,
-                    EnableContext = config.EnableContext,
-                    ContextLines = config.ContextLines,
-                    EnableCache = config.EnableCache,
-                    ExportLog = config.ExportLog,
-                    ErrorThreshold = config.ErrorThreshold,
-                    EnableAutoRefresh = config.EnableAutoRefresh,
-                    AutoRefreshInterval = config.AutoRefreshInterval,
-                    EnableSmartTerminology = config.EnableSmartTerminology,
-                    CurrentTerminologyFile = config.CurrentTerminologyFile
-                };
+                var configToSave = CopyConfigForSave(config);
 
-                // 加密 API Key
-                if (!string.IsNullOrEmpty(configToSave.ApiKey))
+                // 加密所有API端点的密钥
+                if (configToSave.ApiEndpoints != null)
                 {
-                    try
+                    foreach (var endpoint in configToSave.ApiEndpoints)
                     {
-                        // 只加密未加密的 API Key
-                        if (!SecureDataProtection.IsEncrypted(configToSave.ApiKey))
+                        if (!string.IsNullOrEmpty(endpoint.ApiKey))
                         {
-                            configToSave.ApiKey = SecureDataProtection.Protect(configToSave.ApiKey);
+                            try
+                            {
+                                if (!SecureDataProtection.IsEncrypted(endpoint.ApiKey))
+                                {
+                                    endpoint.ApiKey = SecureDataProtection.Protect(endpoint.ApiKey);
+                                }
+                            }
+                            catch
+                            {
+                                // 加密失败，保持明文
+                            }
                         }
-                    }
-                    catch
-                    {
-                        // 加密失败，保存明文（向后兼容）
                     }
                 }
 

@@ -229,16 +229,26 @@ namespace XUnity_LLMTranslatePlus.Views
                         return;
                     }
 
-                    // 创建新的空术语库
+                    // 1. 先保存当前术语库（关键！防止当前术语库被清空）
+                    await AutoSaveTermsAsync();
+
+                    // 2. 清空服务并创建新的空术语库文件
                     _terminologyService?.ClearTerms();
                     await _terminologyService!.SaveTermsAsync(newFilePath);
 
-                    // 刷新列表并选中新文件
+                    // 3. 清空 UI
+                    Terms.Clear();
+
+                    // 4. 临时禁用，防止 SelectionChanged 中的 AutoSave 再次触发
+                    _isLoadingConfig = true;
+
+                    // 5. 刷新列表并选中新文件
                     LoadAvailableTerminologyFiles();
                     _currentTerminologyFile = newFileName;
                     TerminologyFileComboBox.SelectedItem = newFileName;
 
-                    Terms.Clear();
+                    // 6. 重新启用
+                    _isLoadingConfig = false;
 
                     _logService?.Log($"已创建新术语库: {newFileName}", LogLevel.Info);
                 }
@@ -330,27 +340,37 @@ namespace XUnity_LLMTranslatePlus.Views
                 if (result == ContentDialogResult.Primary)
                 {
                     string filePath = GetTerminologyFilePath(_currentTerminologyFile);
+
+                    // 1. 先清空 UI（关键！防止旧数据覆盖默认术语库）
+                    Terms.Clear();
+
+                    // 2. 临时禁用，防止 SelectionChanged 中的 AutoSave 触发
+                    _isLoadingConfig = true;
+
+                    // 3. 删除文件
                     if (File.Exists(filePath))
                     {
                         File.Delete(filePath);
                     }
 
-                    // 切换到默认术语库
+                    // 4. 切换到默认术语库
                     _currentTerminologyFile = "default";
                     LoadAvailableTerminologyFiles();
 
-                    // 重新加载术语
+                    // 5. 手动加载默认术语库
                     if (_terminologyService != null)
                     {
                         string terminologyPath = GetTerminologyFilePath(_currentTerminologyFile);
                         await _terminologyService.LoadTermsAsync(terminologyPath);
                         var terms = _terminologyService.GetTerms();
-                        Terms.Clear();
                         foreach (var term in terms)
                         {
                             Terms.Add(term);
                         }
                     }
+
+                    // 6. 重新启用
+                    _isLoadingConfig = false;
 
                     _logService?.Log($"已删除术语库", LogLevel.Info);
                 }

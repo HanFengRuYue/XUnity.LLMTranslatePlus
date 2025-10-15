@@ -18,6 +18,7 @@ namespace XUnity_LLMTranslatePlus.Services
         private readonly LogService _logService;
         private readonly ConfigService _configService;
         private readonly SmartTerminologyService? _smartTerminologyService;
+        private readonly TranslationDispatcher? _translationDispatcher;
 
         // 统计信息 - 使用 HashSet 追踪已翻译的唯一文本，避免重复计数
         private readonly HashSet<string> _translatedTexts = new HashSet<string>();
@@ -61,13 +62,15 @@ namespace XUnity_LLMTranslatePlus.Services
             TerminologyService terminologyService,
             LogService logService,
             ConfigService configService,
-            SmartTerminologyService? smartTerminologyService = null)
+            SmartTerminologyService? smartTerminologyService = null,
+            TranslationDispatcher? translationDispatcher = null)
         {
             _apiClient = apiClient;
             _terminologyService = terminologyService;
             _logService = logService;
             _configService = configService;
             _smartTerminologyService = smartTerminologyService;
+            _translationDispatcher = translationDispatcher;
         }
 
         /// <summary>
@@ -130,8 +133,32 @@ namespace XUnity_LLMTranslatePlus.Services
 
                 await _logService.LogAsync($"开始翻译: {originalText}", LogLevel.Debug);
 
-                // 5. 调用 API 翻译
-                string translatedText = await _apiClient.TranslateAsync(textToTranslate, systemPrompt, config, cancellationToken);
+                // 5. 调用 API 翻译（始终使用多API端点模式）
+                string translatedText;
+                if (config.ApiEndpoints != null && config.ApiEndpoints.Count > 0)
+                {
+                    // 使用API端点进行翻译
+                    if (_translationDispatcher != null && config.ApiEndpoints.Count > 1)
+                    {
+                        // 多个端点：使用负载均衡
+                        await _logService.LogAsync($"使用多API负载均衡模式 ({config.ApiEndpoints.Count}个端点)", LogLevel.Debug);
+                        translatedText = await _translationDispatcher.DispatchTranslationAsync(
+                            textToTranslate, systemPrompt, config, cancellationToken);
+                    }
+                    else
+                    {
+                        // 单个端点：直接使用该端点
+                        var endpoint = config.ApiEndpoints.First();
+                        await _logService.LogAsync($"使用单端点模式: {endpoint.Name}", LogLevel.Debug);
+                        translatedText = await _apiClient.TranslateAsync(textToTranslate, systemPrompt, endpoint, cancellationToken);
+                    }
+                }
+                else
+                {
+                    // 没有配置端点，抛出异常
+                    await _logService.LogAsync($"未配置API端点，无法翻译", LogLevel.Error);
+                    throw new InvalidOperationException("未配置API端点。请在【API配置】页面添加至少一个API端点。");
+                }
 
                 await _logService.LogAsync($"[API返回] {translatedText}", LogLevel.Info);
 
@@ -217,7 +244,8 @@ namespace XUnity_LLMTranslatePlus.Services
             cancellationToken.ThrowIfCancellationRequested();
 
             // 使用局部信号量以控制并发，避免多次调用冲突
-            using var semaphore = new SemaphoreSlim(config.MaxConcurrentTranslations, config.MaxConcurrentTranslations);
+            // 批量翻译默认使用10个并发（由API端点池管理实际并发）
+            using var semaphore = new SemaphoreSlim(10, 10);
 
             var tasks = texts.Select(async text =>
             {

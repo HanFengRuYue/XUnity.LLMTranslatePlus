@@ -37,11 +37,13 @@ namespace XUnity_LLMTranslatePlus
             // 注册 HttpClient 工厂（.NET 最佳实践）
             services.AddHttpClient();
 
-            // 注册所有服务为单例
+            // 注册所有服务为单例（注意顺序：依赖关系）
             services.AddSingleton<LogService>();
             services.AddSingleton<ConfigService>();
             services.AddSingleton<TerminologyService>();
             services.AddSingleton<ApiClient>();
+            services.AddSingleton<ApiPoolManager>();           // 新增：API池管理器
+            services.AddSingleton<TranslationDispatcher>();    // 新增：翻译分发器
             services.AddSingleton<SmartTerminologyService>();
             services.AddSingleton<TranslationService>();
             services.AddSingleton<FileMonitorService>();
