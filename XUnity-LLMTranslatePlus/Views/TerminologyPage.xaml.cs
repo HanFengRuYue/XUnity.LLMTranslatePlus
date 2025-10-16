@@ -239,15 +239,24 @@ namespace XUnity_LLMTranslatePlus.Views
                     // 3. 清空 UI
                     Terms.Clear();
 
-                    // 4. 临时禁用，防止 SelectionChanged 中的 AutoSave 再次触发
+                    // 4. 切换到新术语库
+                    _currentTerminologyFile = newFileName;
+
+                    // 5. 更新配置并保存（关键！确保重启后能正确加载新术语库）
+                    if (_currentConfig != null && _configService != null)
+                    {
+                        _currentConfig.CurrentTerminologyFile = _currentTerminologyFile;
+                        await _configService.SaveConfigAsync(_currentConfig);
+                    }
+
+                    // 6. 临时禁用，防止 SelectionChanged 重复触发
                     _isLoadingConfig = true;
 
-                    // 5. 刷新列表并选中新文件
+                    // 7. 刷新列表并选中新文件
                     LoadAvailableTerminologyFiles();
-                    _currentTerminologyFile = newFileName;
                     TerminologyFileComboBox.SelectedItem = newFileName;
 
-                    // 6. 重新启用
+                    // 8. 重新启用
                     _isLoadingConfig = false;
 
                     _logService?.Log($"已创建新术语库: {newFileName}", LogLevel.Info);
@@ -302,10 +311,21 @@ namespace XUnity_LLMTranslatePlus.Views
 
                     await _terminologyService!.SaveTermsAsync(newFilePath);
 
-                    // 刷新列表并选中新文件
-                    LoadAvailableTerminologyFiles();
+                    // 切换到新术语库
                     _currentTerminologyFile = newFileName;
+
+                    // 更新配置并保存（关键！确保重启后能正确加载新术语库）
+                    if (_currentConfig != null && _configService != null)
+                    {
+                        _currentConfig.CurrentTerminologyFile = _currentTerminologyFile;
+                        await _configService.SaveConfigAsync(_currentConfig);
+                    }
+
+                    // 刷新列表并选中新文件
+                    _isLoadingConfig = true; // 防止 SelectionChanged 重复触发
+                    LoadAvailableTerminologyFiles();
                     TerminologyFileComboBox.SelectedItem = newFileName;
+                    _isLoadingConfig = false;
 
                     _logService?.Log($"已另存为术语库: {newFileName}", LogLevel.Info);
                 }
@@ -355,9 +375,18 @@ namespace XUnity_LLMTranslatePlus.Views
 
                     // 4. 切换到默认术语库
                     _currentTerminologyFile = "default";
+
+                    // 5. 更新配置并保存（关键！确保重启后能正确加载默认术语库）
+                    if (_currentConfig != null && _configService != null)
+                    {
+                        _currentConfig.CurrentTerminologyFile = _currentTerminologyFile;
+                        await _configService.SaveConfigAsync(_currentConfig);
+                    }
+
+                    // 6. 刷新术语库列表
                     LoadAvailableTerminologyFiles();
 
-                    // 5. 手动加载默认术语库
+                    // 7. 手动加载默认术语库
                     if (_terminologyService != null)
                     {
                         string terminologyPath = GetTerminologyFilePath(_currentTerminologyFile);
@@ -369,7 +398,7 @@ namespace XUnity_LLMTranslatePlus.Views
                         }
                     }
 
-                    // 6. 重新启用
+                    // 8. 重新启用
                     _isLoadingConfig = false;
 
                     _logService?.Log($"已删除术语库", LogLevel.Info);

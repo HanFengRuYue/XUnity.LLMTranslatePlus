@@ -116,6 +116,13 @@ namespace XUnity_LLMTranslatePlus.Services
                     }
                 }
 
+                // 1.5. 检查是否有完全匹配的术语
+                var exactMatchedTerm = _terminologyService.FindExactTerm(textToTranslate);
+                if (exactMatchedTerm != null)
+                {
+                    await _logService.LogAsync($"[术语] 检测到完全匹配: {exactMatchedTerm.Original} -> {exactMatchedTerm.Translation}", LogLevel.Info);
+                }
+
                 // 2. 构建术语参考
                 string termsReference = _terminologyService.BuildTermsReference(textToTranslate);
 
@@ -161,6 +168,13 @@ namespace XUnity_LLMTranslatePlus.Services
                 }
 
                 await _logService.LogAsync($"[API返回] {translatedText}", LogLevel.Info);
+
+                // 5.5. 强制应用完全匹配的术语
+                if (exactMatchedTerm != null)
+                {
+                    await _logService.LogAsync($"[术语] 强制替换: {translatedText} -> {exactMatchedTerm.Translation}", LogLevel.Info);
+                    translatedText = exactMatchedTerm.Translation;
+                }
 
                 // 6. 应用术语库（后处理）
                 translatedText = _terminologyService.ApplyTerms(translatedText);

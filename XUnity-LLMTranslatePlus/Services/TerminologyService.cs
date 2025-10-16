@@ -312,6 +312,28 @@ namespace XUnity_LLMTranslatePlus.Services
         }
 
         /// <summary>
+        /// 查找与文本完全匹配的术语
+        /// </summary>
+        /// <param name="text">要匹配的文本</param>
+        /// <returns>匹配的术语，如果没有匹配则返回 null</returns>
+        public Term? FindExactTerm(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return null;
+            }
+
+            lock (_lockObject)
+            {
+                // 查找启用的、原文完全匹配的术语
+                return _terms
+                    .Where(t => t.Enabled && string.Equals(t.Original, text, StringComparison.Ordinal))
+                    .OrderByDescending(t => t.Original.Length) // 优先返回较长的匹配
+                    .FirstOrDefault();
+            }
+        }
+
+        /// <summary>
         /// 获取默认术语文件路径
         /// </summary>
         public string GetDefaultTermsFilePath() => DefaultTermsFilePath;
