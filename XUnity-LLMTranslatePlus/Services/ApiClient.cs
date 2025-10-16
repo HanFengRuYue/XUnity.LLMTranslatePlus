@@ -139,6 +139,9 @@ namespace XUnity_LLMTranslatePlus.Services
             int timeout, int retryCount,
             CancellationToken cancellationToken)
         {
+            // 标准化API URL（自动补全路径）
+            apiUrl = NormalizeApiUrl(apiUrl);
+
             int currentRetry = 0;
             Exception? lastException = null;
 
@@ -323,6 +326,9 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 await _logService.LogAsync("正在获取模型列表...", LogLevel.Info);
 
+                // 标准化API URL（自动补全路径）
+                apiUrl = NormalizeApiUrl(apiUrl);
+
                 // 构建模型列表API URL
                 string modelsUrl = GetModelsApiUrl(apiUrl);
 
@@ -372,6 +378,58 @@ namespace XUnity_LLMTranslatePlus.Services
             }
         }
 
+        /// <summary>
+        /// 标准化API URL - 自动补全chat/completions路径
+        /// </summary>
+        /// <param name="url">用户输入的URL（可能是基础URL或完整URL）</param>
+        /// <returns>标准化后的完整API URL</returns>
+        private string NormalizeApiUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return url;
+            }
+
+            url = url.TrimEnd('/');
+
+            // 如果已经包含chat/completions路径，直接返回
+            if (url.Contains("/chat/completions"))
+            {
+                return url;
+            }
+
+            // 特殊处理：Azure OpenAI（包含query参数）
+            if (url.Contains("openai.azure.com") && url.Contains("?api-version="))
+            {
+                // Azure URL格式已完整，不需要补全
+                return url;
+            }
+
+            // 智能补全逻辑
+            // 1. 检测是否已经包含v1路径
+            if (url.Contains("/v1") && !url.EndsWith("/v1"))
+            {
+                // 已有v1但后面还有内容，可能是自定义路径，保持不变
+                return url + "/chat/completions";
+            }
+            else if (url.EndsWith("/v1"))
+            {
+                // 以/v1结尾，补全为 /v1/chat/completions
+                return url + "/chat/completions";
+            }
+            else if (url.Contains("openai.com") || url.Contains("localhost") || url.Contains("127.0.0.1"))
+            {
+                // OpenAI官方、Ollama等使用 /v1/chat/completions
+                return url + "/v1/chat/completions";
+            }
+            else
+            {
+                // DeepSeek、Moonshot等国内API使用 /chat/completions
+                // 默认也使用这个格式（更常见）
+                return url + "/chat/completions";
+            }
+        }
+
         private string GetModelsApiUrl(string chatCompletionsUrl)
         {
             // 从chat/completions URL推导出models URL
@@ -383,7 +441,7 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 return chatCompletionsUrl.Replace("/chat/completions", "/models");
             }
-            
+
             // 默认返回OpenAI格式
             return "https://api.openai.com/v1/models";
         }
