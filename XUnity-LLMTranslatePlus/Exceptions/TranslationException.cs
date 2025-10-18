@@ -97,6 +97,30 @@ namespace XUnity_LLMTranslatePlus.Exceptions
     }
 
     /// <summary>
+    /// API速率限制异常（HTTP 429 Too Many Requests）
+    /// </summary>
+    public class RateLimitException : ApiConnectionException
+    {
+        public int? RetryAfterSeconds { get; }
+
+        public RateLimitException(string message, string apiUrl, int? retryAfterSeconds = null)
+            : base(message, apiUrl, 429)
+        {
+            RetryAfterSeconds = retryAfterSeconds;
+        }
+
+        public override string ToString()
+        {
+            string result = base.ToString();
+            if (RetryAfterSeconds.HasValue)
+            {
+                result += $"\nRetry After: {RetryAfterSeconds}s";
+            }
+            return result;
+        }
+    }
+
+    /// <summary>
     /// 配置验证异常
     /// </summary>
     public class ConfigurationValidationException : Exception

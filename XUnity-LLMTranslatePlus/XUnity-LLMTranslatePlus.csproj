@@ -16,6 +16,10 @@
     <Nullable>enable</Nullable>
     <!-- Suppress expected informational warnings -->
     <NoWarn>$(NoWarn);NETSDK1057</NoWarn>
+    <!-- Version Information -->
+    <Version>1.0.1</Version>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

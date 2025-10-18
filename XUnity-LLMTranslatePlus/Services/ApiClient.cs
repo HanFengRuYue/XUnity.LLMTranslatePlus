@@ -144,6 +144,7 @@ namespace XUnity_LLMTranslatePlus.Services
 
             int currentRetry = 0;
             Exception? lastException = null;
+            bool isRateLimited = false;
 
             while (currentRetry <= retryCount)
             {
@@ -200,6 +201,16 @@ namespace XUnity_LLMTranslatePlus.Services
 
                     if (!httpResponse.IsSuccessStatusCode)
                     {
+                        // 检测速率限制错误（HTTP 429）
+                        if (httpResponse.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                        {
+                            isRateLimited = true;
+                            await _logService.LogAsync($"API 速率限制: {responseJson}", LogLevel.Warning);
+                            throw new RateLimitException(
+                                "API 请求过于频繁（TooManyRequests）",
+                                apiUrl);
+                        }
+
                         await _logService.LogAsync($"API 请求失败: {httpResponse.StatusCode} - {responseJson}", LogLevel.Error);
                         throw new ApiConnectionException(
                             $"API 请求失败: {httpResponse.StatusCode}",
@@ -279,7 +290,28 @@ namespace XUnity_LLMTranslatePlus.Services
                 // 如果还有重试次数，等待一段时间后重试
                 if (currentRetry <= retryCount)
                 {
-                    await Task.Delay(2000 * currentRetry, cancellationToken); // 递增延迟，支持取消
+                    int delayMs;
+
+                    if (isRateLimited)
+                    {
+                        // 速率限制错误：使用指数退避 + 随机抖动（3s, 7s, 15s, 30s）
+                        int baseDelay = (int)Math.Pow(2, currentRetry) * 1000; // 2s, 4s, 8s, 16s
+                        int cappedDelay = Math.Min(baseDelay, 30000); // 最大30秒
+                        // 添加随机抖动（±20%）
+                        var random = new Random();
+                        int jitter = random.Next(-cappedDelay / 5, cappedDelay / 5);
+                        delayMs = Math.Max(1000, cappedDelay + jitter); // 至少1秒
+
+                        await _logService.LogAsync($"[速率限制] 等待 {delayMs / 1000.0:F1} 秒后重试", LogLevel.Warning);
+                    }
+                    else
+                    {
+                        // 普通错误：线性递增延迟（2s, 4s, 6s）
+                        delayMs = 2000 * currentRetry;
+                        await _logService.LogAsync($"[重试] 等待 {delayMs / 1000} 秒后重试", LogLevel.Debug);
+                    }
+
+                    await Task.Delay(delayMs, cancellationToken);
                 }
             }
 

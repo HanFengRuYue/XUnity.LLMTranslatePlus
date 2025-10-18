@@ -97,7 +97,26 @@ namespace XUnity_LLMTranslatePlus.Services
 
             try
             {
-                // 1. 提取特殊字符
+                // 1. 优先检查术语库完全匹配（使用原始文本，未转义）
+                var exactMatchedTerm = _terminologyService.FindExactTerm(originalText);
+                if (exactMatchedTerm != null)
+                {
+                    await _logService.LogAsync($"[术语] 检测到完全匹配（跳过翻译）: {exactMatchedTerm.Original} -> {exactMatchedTerm.Translation}", LogLevel.Info);
+
+                    // 记录到已翻译集合（去重统计）
+                    lock (_statsLock)
+                    {
+                        _translatedTexts.Add(originalText);
+                    }
+                    NotifyProgress();
+
+                    // 添加到上下文缓存
+                    AddToContext(originalText, exactMatchedTerm.Translation, config);
+
+                    return exactMatchedTerm.Translation;
+                }
+
+                // 2. 提取特殊字符（仅在术语匹配失败后）
                 var extraction = config.PreserveSpecialChars
                     ? EscapeCharacterHandler.ExtractSpecialChars(originalText)
                     : new EscapeCharacterHandler.ExtractionResult { CleanedText = originalText };
@@ -116,20 +135,13 @@ namespace XUnity_LLMTranslatePlus.Services
                     }
                 }
 
-                // 1.5. 检查是否有完全匹配的术语
-                var exactMatchedTerm = _terminologyService.FindExactTerm(textToTranslate);
-                if (exactMatchedTerm != null)
-                {
-                    await _logService.LogAsync($"[术语] 检测到完全匹配: {exactMatchedTerm.Original} -> {exactMatchedTerm.Translation}", LogLevel.Info);
-                }
-
-                // 2. 构建术语参考
+                // 3. 构建术语参考
                 string termsReference = _terminologyService.BuildTermsReference(textToTranslate);
 
-                // 3. 构建上下文参考
+                // 4. 构建上下文参考
                 string contextReference = BuildContextReference(config);
 
-                // 4. 构建系统提示词
+                // 5. 构建系统提示词
                 string systemPrompt = BuildSystemPrompt(
                     config.SystemPrompt,
                     config.TargetLanguage,
@@ -140,7 +152,7 @@ namespace XUnity_LLMTranslatePlus.Services
 
                 await _logService.LogAsync($"开始翻译: {originalText}", LogLevel.Debug);
 
-                // 5. 调用 API 翻译（始终使用多API端点模式）
+                // 6. 调用 API 翻译（始终使用多API端点模式）
                 string translatedText;
                 if (config.ApiEndpoints != null && config.ApiEndpoints.Count > 0)
                 {
@@ -169,17 +181,10 @@ namespace XUnity_LLMTranslatePlus.Services
 
                 await _logService.LogAsync($"[API返回] {translatedText}", LogLevel.Info);
 
-                // 5.5. 强制应用完全匹配的术语
-                if (exactMatchedTerm != null)
-                {
-                    await _logService.LogAsync($"[术语] 强制替换: {translatedText} -> {exactMatchedTerm.Translation}", LogLevel.Info);
-                    translatedText = exactMatchedTerm.Translation;
-                }
-
-                // 6. 应用术语库（后处理）
+                // 7. 应用术语库（后处理）
                 translatedText = _terminologyService.ApplyTerms(translatedText);
 
-                // 7. 还原特殊字符
+                // 8. 还原特殊字符（仅在执行过转义时）
                 if (config.PreserveSpecialChars && extraction.SpecialChars.Count > 0)
                 {
                     await _logService.LogAsync($"[还原前] {translatedText}", LogLevel.Info);
@@ -187,10 +192,10 @@ namespace XUnity_LLMTranslatePlus.Services
                     await _logService.LogAsync($"[还原后] {translatedText}", LogLevel.Info);
                 }
 
-                // 8. 添加到上下文缓存
+                // 9. 添加到上下文缓存
                 AddToContext(originalText, translatedText, config);
 
-                // 9. 智能术语提取（异步，不阻塞翻译流程）
+                // 10. 智能术语提取（异步，不阻塞翻译流程）
                 if (_smartTerminologyService != null && config.EnableSmartTerminology)
                 {
                     // 使用 Task.Run 在后台执行，不等待结果

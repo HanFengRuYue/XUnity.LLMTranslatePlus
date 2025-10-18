@@ -44,7 +44,7 @@ finally { _semaphore.Release(); }
 
 ### 2. High-Performance Batching with Channel<T>
 **LogService.cs**: Batches log writes (50 entries or 2s)
-**FileMonitorService.cs**: Batches file writes (5 translations or 2s) to prevent XUnity conflicts
+**FileMonitorService.cs**: Batches file writes (2 translations or 0.5s) to prevent XUnity conflicts while minimizing write latency
 
 **Critical Patterns**:
 - Initialize Channel BEFORE any code writes to it
@@ -113,18 +113,33 @@ key2="value with spaces"
 
 ## Translation Pipeline (TranslationService.cs)
 
+**CRITICAL**: Terminology matching happens FIRST using original text (before escape processing) to prevent escape characters from breaking term matching.
+
 1. Increment `TranslatingCount` (thread-safe counter)
-2. Extract special characters → placeholders (e.g., `【SPECIAL_0】`)
-3. Build context (N recent translations, thread-safe with `_contextLock`)
-4. Build system prompt (replaces `{目标语言}`, `{原文}`, `{术语}`, `{上下文}`)
-5. Call API with retry + exponential backoff
-6. Apply terminology post-processing
-7. Restore special characters intelligently
-8. Update context cache (thread-safe: `AddToContext(original, translated, config)`)
-9. Smart terminology extraction (async background with `Task.Run`, non-blocking)
-10. Decrement `TranslatingCount` (in `finally` block)
+2. **Check exact terminology match using original text** → If matched, return translation immediately (skip steps 3-7)
+3. Extract special characters → placeholders (e.g., `【SPECIAL_0】`) - ONLY if step 2 fails
+4. Build terminology reference for partial matches
+5. Build context (N recent translations, thread-safe with `_contextLock`)
+6. Build system prompt (replaces `{目标语言}`, `{原文}`, `{术语}`, `{上下文}`)
+7. Call API with **retry + exponential backoff** (see API Retry Strategy below)
+8. Apply terminology post-processing (partial term replacements)
+9. Restore special characters intelligently
+10. Update context cache (thread-safe: `AddToContext(original, translated, config)`)
+11. Smart terminology extraction (async background with `Task.Run`, non-blocking)
+12. Decrement `TranslatingCount` (in `finally` block)
 
 **Statistics**: `TotalTranslated` uses `HashSet<string>` for unique count deduplication.
+
+### API Retry Strategy (ApiClient.cs)
+
+**Rate Limiting (HTTP 429)**:
+- Exponential backoff with random jitter: 2s → 4s → 8s → 16s (capped at 30s)
+- Jitter: ±20% randomization to prevent thundering herd
+- Does NOT count toward error threshold (automatically recoverable)
+
+**Other Errors**:
+- Linear backoff: 2s → 4s → 6s
+- Counts toward `ErrorThreshold` configuration
 
 ## File Monitoring Pipeline (FileMonitorService.cs)
 
@@ -292,6 +307,10 @@ private void TriggerAutoSave()
 
 16. **Channel Write During Shutdown**: Use `TryWrite()` instead of `WriteAsync()` for Channels that may be closed during shutdown. Check return value and exit gracefully if false.
 
+17. **Translation Pipeline Order**: Terminology matching MUST happen BEFORE escape character processing. If you extract special chars first (e.g., `\n` → `【SPECIAL_0】`), terminology database entries containing `\n` will never match. Always check `FindExactTerm()` with original text first, then proceed with escape processing only if no match found.
+
+18. **Rate Limiting Resilience**: HTTP 429 errors are transient and should use exponential backoff (not linear). They should NOT increment `TotalFailed` or count toward `ErrorThreshold` since they automatically recover with proper delays. Use `RateLimitException` for special handling.
+
 ## Performance Notes
 
 - **Concurrent Limits**: Default 3, max 100. Higher values may hit rate limits.
@@ -302,10 +321,14 @@ private void TriggerAutoSave()
 ## Exception Hierarchy (Exceptions/TranslationException.cs)
 
 - `TranslationException` - Base
-- `ApiConnectionException` - Network/HTTP
-- `ApiResponseException` - API parsing
-- `TranslationTimeoutException` - Timeout
+- `ApiConnectionException` - Network/HTTP errors
+  - `RateLimitException` - HTTP 429 (Too Many Requests), includes optional `RetryAfterSeconds`
+- `ApiResponseException` - API parsing errors
+- `TranslationTimeoutException` - Timeout errors
 - `ConfigurationValidationException` - Config validation
-- `FileOperationException` - File I/O
+- `FileOperationException` - File I/O errors
 
-Catch specific types first, then base types. Never swallow exceptions without logging.
+**Best Practices**:
+- Catch specific types first (e.g., `RateLimitException`), then base types
+- `RateLimitException` should trigger exponential backoff, NOT count toward error threshold
+- Never swallow exceptions without logging

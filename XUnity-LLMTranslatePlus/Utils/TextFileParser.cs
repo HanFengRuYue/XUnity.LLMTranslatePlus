@@ -161,15 +161,21 @@ namespace XUnity_LLMTranslatePlus.Utils
                         {
                             // 使用 Span<char> 优化字符串操作，减少内存分配
                             ReadOnlySpan<char> lineSpan = line.AsSpan();
-                            string key = lineSpan.Slice(0, separatorIndex).Trim().ToString();
+                            ReadOnlySpan<char> keySpan = lineSpan.Slice(0, separatorIndex).Trim();
                             ReadOnlySpan<char> valueSpan = lineSpan.Slice(separatorIndex + 1).Trim();
 
-                            // 移除可能的引号
+                            // 移除可能的引号（key 和 value 都需要处理）
+                            if (keySpan.Length >= 2 && keySpan[0] == '"' && keySpan[^1] == '"')
+                            {
+                                keySpan = keySpan.Slice(1, keySpan.Length - 2);
+                            }
+
                             if (valueSpan.Length >= 2 && valueSpan[0] == '"' && valueSpan[^1] == '"')
                             {
                                 valueSpan = valueSpan.Slice(1, valueSpan.Length - 2);
                             }
 
+                            string key = keySpan.ToString();
                             string value = valueSpan.ToString();
 
                             var entry = new TranslationEntry
@@ -285,15 +291,25 @@ namespace XUnity_LLMTranslatePlus.Utils
                             {
                                 // 使用 Span<char> 优化
                                 ReadOnlySpan<char> lineSpan = line.AsSpan();
-                                string key = lineSpan.Slice(0, separatorIndex).Trim().ToString();
+                                ReadOnlySpan<char> keySpan = lineSpan.Slice(0, separatorIndex).Trim();
+
+                                // 检测原始行是否使用引号格式
+                                bool keyHasQuotes = keySpan.Length >= 2 && keySpan[0] == '"' && keySpan[^1] == '"';
+
+                                // 移除引号以匹配存储的 key
+                                if (keyHasQuotes)
+                                {
+                                    keySpan = keySpan.Slice(1, keySpan.Length - 2);
+                                }
+
+                                string key = keySpan.ToString();
 
                                 // 如果有更新的翻译，使用新的值
                                 if (_translations.TryGetValue(key, out string? newValue))
                                 {
                                     // 保持原始格式（是否有引号）
-                                    bool hasQuotes = line.Contains("\"");
-                                    string newLine = hasQuotes
-                                        ? $"{key}=\"{newValue}\""
+                                    string newLine = keyHasQuotes
+                                        ? $"\"{key}\"=\"{newValue}\""
                                         : $"{key}={newValue}";
 
                                     outputLines.Add(newLine);

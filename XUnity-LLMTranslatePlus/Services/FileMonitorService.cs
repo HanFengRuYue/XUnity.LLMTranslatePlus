@@ -41,8 +41,8 @@ namespace XUnity_LLMTranslatePlus.Services
         // 批量写入机制
         private readonly Channel<Dictionary<string, string>> _writeQueue;
         private Task? _writerTask;
-        private readonly TimeSpan _batchWriteInterval = TimeSpan.FromSeconds(2);
-        private const int BatchWriteSize = 5;
+        private readonly TimeSpan _batchWriteInterval = TimeSpan.FromSeconds(0.5); // 优化：从2秒降低到0.5秒
+        private const int BatchWriteSize = 2; // 优化：从5条降低到2条
 
         public event EventHandler<FileMonitorEventArgs>? StatusChanged;
         public event EventHandler<TranslationEntry>? EntryTranslated;
@@ -635,7 +635,7 @@ namespace XUnity_LLMTranslatePlus.Services
                     {
                         // 使用 WaitToReadAsync 配合 TryRead 避免 continuation 冲突
                         var waitToReadTask = _writeQueue.Reader.WaitToReadAsync(cancellationToken).AsTask();
-                        var timeoutTask = Task.Delay(500, cancellationToken);
+                        var timeoutTask = Task.Delay(200, cancellationToken); // 优化：从500ms降低到200ms
 
                         var completedTask = await Task.WhenAny(waitToReadTask, timeoutTask);
 

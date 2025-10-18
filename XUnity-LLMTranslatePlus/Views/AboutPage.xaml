@@ -26,7 +26,7 @@
                     <StackPanel VerticalAlignment="Center" Spacing="4">
                         <TextBlock Text="XUnity大语言模型翻译Plus"
                                    Style="{StaticResource SubtitleTextBlockStyle}"/>
-                        <TextBlock Text="版本 1.0.0"
+                        <TextBlock Text="版本 1.0.1"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </StackPanel>
                 </StackPanel>
