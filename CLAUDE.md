@@ -18,12 +18,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 dotnet build
 dotnet run --project XUnity-LLMTranslatePlus/XUnity-LLMTranslatePlus.csproj
 
-# Release (Recommended)
+# Release (Recommended - builds all architectures)
 .\Build-Release.ps1
 
-# Manual publish
+# Manual publish (single architecture)
 dotnet publish --configuration Release --runtime win-x64 --self-contained false /p:PublishSingleFile=true
 ```
+
+### Release Build Script (Build-Release.ps1)
+
+**Features**:
+- Builds three architectures simultaneously: **x86**, **x64**, **arm64**
+- Automatically compresses each build with 7-Zip (maximum compression)
+- Outputs both executables and distribution-ready ZIP files
+
+**Requirements**:
+- 7-Zip installed at `C:\Program Files\7-Zip\7z.exe`
+- If 7-Zip is not found, script will exit with error
+
+**Output Structure**:
+```
+Release/
+├── win-x86/
+│   └── XUnity-LLMTranslatePlus.exe
+├── win-x64/
+│   └── XUnity-LLMTranslatePlus.exe
+├── win-arm64/
+│   └── XUnity-LLMTranslatePlus.exe
+├── XUnity-LLMTranslatePlus-win-x86.zip   (for distribution)
+├── XUnity-LLMTranslatePlus-win-x64.zip   (for distribution)
+└── XUnity-LLMTranslatePlus-win-arm64.zip (for distribution)
+```
+
+**ZIP Contents**: Each archive contains only the single EXE file (no folder structure), allowing users to extract directly.
+
+**Compression**: ~40MB EXE → ~10MB ZIP (~75% compression ratio)
+
+**Options**:
+- `-SkipClean`: Skip cleaning previous builds (faster for incremental builds)
 
 **Critical**: Single-file deployment requires environment variable in `App.xaml.cs`:
 ```csharp

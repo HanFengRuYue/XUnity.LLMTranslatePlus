@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Reflection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.System;
@@ -11,6 +12,16 @@ namespace XUnity_LLMTranslatePlus.Views
     {
         private readonly ConfigService? _configService;
         private readonly LogService? _logService;
+
+        // 从程序集自动获取版本号
+        public string AppVersion
+        {
+            get
+            {
+                var version = Assembly.GetExecutingAssembly().GetName().Version;
+                return version != null ? $"版本 {version.Major}.{version.Minor}.{version.Build}" : "版本 未知";
+            }
+        }
 
         public AboutPage()
         {
