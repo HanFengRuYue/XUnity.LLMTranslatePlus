@@ -423,14 +423,73 @@ namespace XUnity_LLMTranslatePlus.Views
             TriggerAutoSave();
         }
 
-        private void DeleteTermButton_Click(object sender, RoutedEventArgs e)
+        private void SelectAllButton_Click(object sender, RoutedEventArgs e)
         {
-            if (TermsListView.SelectedItem is Term selectedTerm)
+            TermsListView.SelectAll();
+        }
+
+        private void DeselectAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            TermsListView.SelectedItems.Clear();
+        }
+
+        private void TermsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoadingConfig) return;
+
+            int selectedCount = TermsListView.SelectedItems.Count;
+
+            // 更新选中项数量提示
+            if (selectedCount > 0)
             {
-                Terms.Remove(selectedTerm);
-                _terminologyService?.RemoveTerm(selectedTerm);
-                TriggerAutoSave();
+                SelectionCountText.Text = $"已选中 {selectedCount} 项";
+                DeleteTermButton.IsEnabled = true;
             }
+            else
+            {
+                SelectionCountText.Text = "";
+                DeleteTermButton.IsEnabled = false;
+            }
+        }
+
+        private async void DeleteTermButton_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItems = TermsListView.SelectedItems.Cast<Term>().ToList();
+
+            if (selectedItems.Count == 0)
+            {
+                return;
+            }
+
+            // 如果选中多个术语，显示确认对话框
+            if (selectedItems.Count > 1)
+            {
+                ContentDialog dialog = new ContentDialog
+                {
+                    Title = "确认删除",
+                    Content = $"确定要删除选中的 {selectedItems.Count} 个术语吗？此操作不可恢复。",
+                    PrimaryButtonText = "删除",
+                    CloseButtonText = "取消",
+                    XamlRoot = this.XamlRoot
+                };
+
+                var result = await dialog.ShowAsync();
+                if (result != ContentDialogResult.Primary)
+                {
+                    return;
+                }
+            }
+
+            // 批量删除选中的术语
+            foreach (var term in selectedItems)
+            {
+                Terms.Remove(term);
+                _terminologyService?.RemoveTerm(term);
+            }
+
+            TriggerAutoSave();
+
+            _logService?.Log($"已删除 {selectedItems.Count} 个术语", LogLevel.Info);
         }
 
         private async void ImportTermsButton_Click(object sender, RoutedEventArgs e)
