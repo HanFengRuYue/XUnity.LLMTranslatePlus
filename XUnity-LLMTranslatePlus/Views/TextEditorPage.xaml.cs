@@ -123,17 +123,17 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 var config = _configService.GetCurrentConfig();
 
-                // 快速返回：如果没有设置游戏目录，显示空状态提示
-                if (string.IsNullOrWhiteSpace(config.GameDirectory))
+                // 快速返回：如果没有设置游戏目录且没有手动指定文件，显示空状态提示
+                if (string.IsNullOrWhiteSpace(config.GameDirectory) && string.IsNullOrWhiteSpace(config.ManualTranslationFilePath))
                 {
                     ShowEmptyState(true);
-                    _logService?.Log("未设置游戏目录，请在翻译设置中配置", LogLevel.Info);
+                    _logService?.Log("未设置游戏目录或手动指定翻译文件，请在翻译设置中配置", LogLevel.Info);
                     return;
                 }
 
                 // 添加超时保护（最多等待10秒）
                 using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
-                await _textEditorService.LoadFromGameDirectoryAsync(config.GameDirectory);
+                await _textEditorService.LoadFromConfigAsync(config);
             }
             catch (OperationCanceledException)
             {
@@ -225,12 +225,12 @@ namespace XUnity_LLMTranslatePlus.Views
             try
             {
                 var config = _configService.GetCurrentConfig();
-                if (string.IsNullOrEmpty(config.GameDirectory))
+                if (string.IsNullOrEmpty(config.GameDirectory) && string.IsNullOrEmpty(config.ManualTranslationFilePath))
                 {
                     ContentDialog dialog = new ContentDialog
                     {
                         Title = "提示",
-                        Content = "请先在翻译设置页面配置游戏目录",
+                        Content = "请先在翻译设置页面配置游戏目录或手动指定翻译文件",
                         CloseButtonText = "确定",
                         XamlRoot = this.XamlRoot
                     };
@@ -238,7 +238,7 @@ namespace XUnity_LLMTranslatePlus.Views
                     return;
                 }
 
-                await _textEditorService.LoadFromGameDirectoryAsync(config.GameDirectory);
+                await _textEditorService.LoadFromConfigAsync(config);
             }
             catch (Exception ex)
             {

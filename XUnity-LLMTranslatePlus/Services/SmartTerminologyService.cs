@@ -199,7 +199,36 @@ namespace XUnity_LLMTranslatePlus.Services
                     PropertyNameCaseInsensitive = true
                 });
 
-                return terms ?? new List<ExtractedTerm>();
+                if (terms == null || terms.Count == 0)
+                {
+                    return new List<ExtractedTerm>();
+                }
+
+                // 过滤无效术语
+                int originalCount = terms.Count;
+                var filteredTerms = terms.Where(t =>
+                    // 基本验证
+                    !string.IsNullOrWhiteSpace(t.Original) &&
+                    !string.IsNullOrWhiteSpace(t.Translation) &&
+                    t.Original.Length >= 2 &&
+                    t.Translation.Length >= 2 &&
+                    // 过滤包含 SPECIAL 占位符的术语
+                    !t.Original.Contains("SPECIAL", StringComparison.OrdinalIgnoreCase) &&
+                    !t.Translation.Contains("SPECIAL", StringComparison.OrdinalIgnoreCase) &&
+                    // 过滤包含占位符标记的术语
+                    !t.Original.Contains("【") && !t.Original.Contains("】") &&
+                    !t.Translation.Contains("【") && !t.Translation.Contains("】") &&
+                    // 过滤原文和译文完全相同的术语
+                    !t.Original.Equals(t.Translation, StringComparison.Ordinal)
+                ).ToList();
+
+                int filteredCount = originalCount - filteredTerms.Count;
+                if (filteredCount > 0)
+                {
+                    _logService.Log($"[智能术语] 过滤了 {filteredCount} 个无效术语", LogLevel.Debug);
+                }
+
+                return filteredTerms;
             }
             catch (Exception ex)
             {
