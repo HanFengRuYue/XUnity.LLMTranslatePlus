@@ -73,6 +73,12 @@ namespace XUnity_LLMTranslatePlus.Views
             EnableCacheToggle.IsOn = config.EnableCache;
             SystemPromptTextBox.Text = config.SystemPrompt;
 
+            // 文本聚合配置
+            EnableTextAggregationToggle.IsOn = config.EnableTextAggregation;
+            TextAggregationDelaySlider.Value = config.TextAggregationDelay;
+            AggregationDelayValueText.Text = config.TextAggregationDelay.ToString("F1");
+            TextAggregationConfigPanel.Visibility = config.EnableTextAggregation ? Visibility.Visible : Visibility.Collapsed;
+
             // 自动检测翻译文件路径
             if (config.AutoDetectPath && !string.IsNullOrEmpty(config.GameDirectory))
             {
@@ -96,6 +102,8 @@ namespace XUnity_LLMTranslatePlus.Views
             config.ContextLines = (int)ContextLinesNumberBox.Value;
             config.EnableCache = EnableCacheToggle.IsOn;
             config.SystemPrompt = SystemPromptTextBox.Text;
+            config.EnableTextAggregation = EnableTextAggregationToggle.IsOn;
+            config.TextAggregationDelay = TextAggregationDelaySlider.Value;
 
             return config;
         }
@@ -303,6 +311,24 @@ namespace XUnity_LLMTranslatePlus.Views
         private void ResetPromptButton_Click(object sender, RoutedEventArgs e)
         {
             SystemPromptTextBox.Text = "你是一个专业的游戏文本翻译助手。请将以下文本翻译成{目标语言}。保持原文的语气和风格，确保翻译准确、流畅、自然。\n\n【重要】如果文本中包含形如【SPECIAL_数字】的占位符，请务必在译文中完整保留这些占位符，不要翻译或修改它们。\n\n原文：{原文}\n\n术语参考：{术语}\n\n上下文参考：{上下文}\n\n请只输出翻译结果，不要包含任何解释或额外内容。";
+        }
+
+        private void EnableTextAggregationToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (TextAggregationConfigPanel != null)
+            {
+                TextAggregationConfigPanel.Visibility = EnableTextAggregationToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+            }
+            TriggerAutoSave();
+        }
+
+        private void TextAggregationDelaySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (AggregationDelayValueText != null)
+            {
+                AggregationDelayValueText.Text = e.NewValue.ToString("F1");
+            }
+            TriggerAutoSave();
         }
     }
 }

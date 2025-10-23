@@ -150,7 +150,9 @@ namespace XUnity_LLMTranslatePlus.Services
                 EnableAutoRefresh = config.EnableAutoRefresh,
                 AutoRefreshInterval = config.AutoRefreshInterval,
                 EnableSmartTerminology = config.EnableSmartTerminology,
-                CurrentTerminologyFile = config.CurrentTerminologyFile
+                CurrentTerminologyFile = config.CurrentTerminologyFile,
+                EnableTextAggregation = config.EnableTextAggregation,
+                TextAggregationDelay = config.TextAggregationDelay
             };
         }
 
@@ -212,6 +214,11 @@ namespace XUnity_LLMTranslatePlus.Services
             if (config.ContextLines < 1)
             {
                 throw new ConfigurationValidationException($"上下文行数必须大于0，当前值: {config.ContextLines}", nameof(config.ContextLines));
+            }
+
+            if (config.TextAggregationDelay < 1.0 || config.TextAggregationDelay > 10.0)
+            {
+                throw new ConfigurationValidationException($"文本聚合延迟必须在1到10秒之间，当前值: {config.TextAggregationDelay}", nameof(config.TextAggregationDelay));
             }
         }
 

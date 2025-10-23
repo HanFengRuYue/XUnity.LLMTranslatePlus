@@ -129,6 +129,41 @@
                                       OnContent="已启用"
                                       OffContent="已禁用"
                                       Toggled="RealTimeMonitoringToggle_Toggled"/>
+
+                        <!-- 文本聚合（打字机效果优化） -->
+                        <ToggleSwitch x:Name="EnableTextAggregationToggle"
+                                      Header="启用文本聚合（应对打字机效果）"
+                                      IsOn="True"
+                                      OnContent="已启用"
+                                      OffContent="已禁用"
+                                      Toggled="EnableTextAggregationToggle_Toggled"/>
+
+                        <!-- 文本聚合配置面板 -->
+                        <StackPanel x:Name="TextAggregationConfigPanel"
+                                    Spacing="12"
+                                    Visibility="Visible">
+                            <!-- 聚合延迟时间 -->
+                            <StackPanel Spacing="4">
+                                <TextBlock>
+                                    <Run Text="文本聚合延迟时间："/>
+                                    <Run x:Name="AggregationDelayValueText" Text="2.0" FontWeight="SemiBold"/>
+                                    <Run Text=" 秒"/>
+                                </TextBlock>
+                                <Slider x:Name="TextAggregationDelaySlider"
+                                        Minimum="1.0"
+                                        Maximum="10.0"
+                                        StepFrequency="0.5"
+                                        TickFrequency="1.0"
+                                        TickPlacement="BottomRight"
+                                        Value="2.0"
+                                        ValueChanged="TextAggregationDelaySlider_ValueChanged"/>
+                            </StackPanel>
+
+                            <InfoBar Severity="Informational"
+                                     IsOpen="True"
+                                     IsClosable="False"
+                                     Message="启用文本聚合可以应对游戏打字机效果，避免翻译未完成的句子。延迟时间决定等待文本稳定多久后再翻译。"/>
+                        </StackPanel>
                 </StackPanel>
             </Expander>
 

@@ -40,6 +40,10 @@ namespace XUnity_LLMTranslatePlus.Models
         public bool PreserveSpecialChars { get; set; } = true;
         public bool RealTimeMonitoring { get; set; } = true;
 
+        // 文本聚合配置（应对打字机效果）
+        public bool EnableTextAggregation { get; set; } = true;
+        public double TextAggregationDelay { get; set; } = 2.0; // 延迟时间（秒），范围 1.0-10.0
+
         // 上下文配置
         public bool EnableContext { get; set; } = true;
         public int ContextLines { get; set; } = 10;

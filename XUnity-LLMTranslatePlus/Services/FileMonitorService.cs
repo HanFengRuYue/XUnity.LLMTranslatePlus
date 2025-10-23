@@ -44,6 +44,11 @@ namespace XUnity_LLMTranslatePlus.Services
         private readonly TimeSpan _batchWriteInterval = TimeSpan.FromSeconds(0.5); // 优化：从2秒降低到0.5秒
         private const int BatchWriteSize = 2; // 优化：从5条降低到2条
 
+        // 文本聚合机制（应对打字机效果）
+        private readonly Dictionary<string, TextObservation> _textObservations = new Dictionary<string, TextObservation>();
+        private readonly object _observationLock = new object();
+        private Task? _aggregationTask;
+
         public event EventHandler<FileMonitorEventArgs>? StatusChanged;
         public event EventHandler<TranslationEntry>? EntryTranslated;
         public event EventHandler<string>? ErrorThresholdReached;
@@ -187,6 +192,13 @@ namespace XUnity_LLMTranslatePlus.Services
                 // 启动批量写入任务
                 StartWriterTask();
 
+                // 启动文本聚合任务（如果启用）
+                if (config.EnableTextAggregation)
+                {
+                    StartAggregationTask();
+                    await _logService.LogAsync($"文本聚合已启用，延迟时间: {config.TextAggregationDelay}秒", LogLevel.Info);
+                }
+
                 await _logService.LogAsync("文件监控已启动", LogLevel.Info);
                 NotifyStatusChanged("运行中", true);
             }
@@ -218,6 +230,20 @@ namespace XUnity_LLMTranslatePlus.Services
             // 停止Channel写入
             _pendingTexts?.Writer.Complete();
             _writeQueue.Writer.Complete();
+
+            // 等待文本聚合任务完成
+            if (_aggregationTask != null)
+            {
+                try
+                {
+                    await _aggregationTask.WaitAsync(TimeSpan.FromSeconds(3));
+                }
+                catch (TimeoutException)
+                {
+                    await _logService.LogAsync("等待聚合任务完成超时", LogLevel.Warning);
+                }
+                _aggregationTask = null;
+            }
 
             // 等待批量写入任务完成
             if (_writerTask != null)
@@ -267,6 +293,12 @@ namespace XUnity_LLMTranslatePlus.Services
             lock (_processedTexts)
             {
                 _processedTexts.Clear();
+            }
+
+            // 清空观察缓存
+            lock (_observationLock)
+            {
+                _textObservations.Clear();
             }
 
             // 释放取消标记源
@@ -375,9 +407,13 @@ namespace XUnity_LLMTranslatePlus.Services
                 {
                     await _logService.LogAsync($"发现 {untranslated.Count} 条未翻译文本", LogLevel.Info);
 
+                    // 获取配置
+                    var config = _configService.GetCurrentConfig();
+
                     // 添加到待处理Channel（检查是否已处理）
                     int addedCount = 0;
                     int removedFromCacheCount = 0;
+                    int aggregatedCount = 0;
                     var removedPreviews = new List<string>();
 
                     foreach (var entry in untranslated)
@@ -410,12 +446,24 @@ namespace XUnity_LLMTranslatePlus.Services
                             removedPreviews.Add(preview);
                         }
 
-                        // 添加到Channel（非阻塞）
+                        // 根据配置决定是直接添加还是进入聚合观察期
                         if (shouldAdd && _pendingTexts != null)
                         {
-                            if (_pendingTexts.Writer.TryWrite(entry.Key))
+                            if (config.EnableTextAggregation)
                             {
-                                addedCount++;
+                                // 使用文本聚合机制
+                                if (AddToTextObservation(entry.Key))
+                                {
+                                    aggregatedCount++;
+                                }
+                            }
+                            else
+                            {
+                                // 直接添加到翻译队列
+                                if (_pendingTexts.Writer.TryWrite(entry.Key))
+                                {
+                                    addedCount++;
+                                }
                             }
                         }
                     }
@@ -429,6 +477,11 @@ namespace XUnity_LLMTranslatePlus.Services
                     if (addedCount > 0)
                     {
                         await _logService.LogAsync($"新增 {addedCount} 条待翻译文本到队列", LogLevel.Info);
+                    }
+
+                    if (aggregatedCount > 0)
+                    {
+                        await _logService.LogAsync($"新增 {aggregatedCount} 条文本进入聚合观察期", LogLevel.Debug);
                     }
 
                     if (removedFromCacheCount > 0)
@@ -765,6 +818,157 @@ namespace XUnity_LLMTranslatePlus.Services
                 : 0;
         }
 
+        /// <summary>
+        /// 添加文本到观察期（前缀检测逻辑）
+        /// </summary>
+        private bool AddToTextObservation(string text)
+        {
+            lock (_observationLock)
+            {
+                var now = DateTime.UtcNow;
+                bool isNewOrUpdated = false;
+
+                // 检查是否与现有观察文本有前缀关系
+                var keysToRemove = new List<string>();
+
+                foreach (var kvp in _textObservations)
+                {
+                    var existingText = kvp.Value.Text;
+
+                    // 如果新文本是现有文本的前缀（说明现有文本更完整，丢弃新文本）
+                    if (existingText.StartsWith(text, StringComparison.Ordinal) && existingText.Length > text.Length)
+                    {
+                        // 不添加新文本，保持现有的更长的文本
+                        return false;
+                    }
+
+                    // 如果现有文本是新文本的前缀（说明新文本是延续，替换为新文本）
+                    if (text.StartsWith(existingText, StringComparison.Ordinal) && text.Length > existingText.Length)
+                    {
+                        keysToRemove.Add(kvp.Key);
+                        isNewOrUpdated = true;
+                    }
+                }
+
+                // 移除被新文本替代的旧文本
+                foreach (var key in keysToRemove)
+                {
+                    _textObservations.Remove(key);
+                }
+
+                // 添加或更新观察记录
+                if (_textObservations.ContainsKey(text))
+                {
+                    // 更新最后更新时间
+                    _textObservations[text].LastUpdateTime = now;
+                }
+                else
+                {
+                    // 添加新观察记录
+                    _textObservations[text] = new TextObservation
+                    {
+                        Text = text,
+                        FirstSeenTime = now,
+                        LastUpdateTime = now
+                    };
+                    isNewOrUpdated = true;
+                }
+
+                return isNewOrUpdated;
+            }
+        }
+
+        /// <summary>
+        /// 启动文本聚合检查任务
+        /// </summary>
+        private void StartAggregationTask()
+        {
+            _aggregationTask = Task.Run(async () => await AggregationCheckTaskAsync());
+            _logService.Log("文本聚合检查任务已启动", LogLevel.Debug);
+        }
+
+        /// <summary>
+        /// 文本聚合检查任务（定期检查稳定的文本并加入翻译队列）
+        /// </summary>
+        private async Task AggregationCheckTaskAsync()
+        {
+            if (_cancellationTokenSource == null)
+            {
+                return;
+            }
+
+            var cancellationToken = _cancellationTokenSource.Token;
+
+            await _logService.LogAsync("[聚合检查] 任务已启动", LogLevel.Debug);
+
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested && IsMonitoring)
+                {
+                    await Task.Delay(500, cancellationToken); // 每500ms检查一次
+
+                    var config = _configService.GetCurrentConfig();
+                    if (!config.EnableTextAggregation)
+                    {
+                        continue;
+                    }
+
+                    var delay = TimeSpan.FromSeconds(config.TextAggregationDelay);
+                    var now = DateTime.UtcNow;
+                    var stableTexts = new List<string>();
+
+                    // 查找已稳定的文本
+                    lock (_observationLock)
+                    {
+                        foreach (var kvp in _textObservations)
+                        {
+                            var observation = kvp.Value;
+                            var timeSinceLastUpdate = now - observation.LastUpdateTime;
+
+                            if (timeSinceLastUpdate >= delay)
+                            {
+                                stableTexts.Add(observation.Text);
+                            }
+                        }
+
+                        // 从观察缓存中移除已稳定的文本
+                        foreach (var text in stableTexts)
+                        {
+                            _textObservations.Remove(text);
+                        }
+                    }
+
+                    // 将稳定的文本加入翻译队列
+                    if (stableTexts.Count > 0 && _pendingTexts != null)
+                    {
+                        int addedCount = 0;
+                        foreach (var text in stableTexts)
+                        {
+                            if (_pendingTexts.Writer.TryWrite(text))
+                            {
+                                addedCount++;
+                            }
+                        }
+
+                        if (addedCount > 0)
+                        {
+                            await _logService.LogAsync($"[聚合检查] {addedCount} 条文本已稳定，加入翻译队列", LogLevel.Info);
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // 正常取消，忽略
+            }
+            catch (Exception ex)
+            {
+                await _logService.LogAsync($"[聚合检查] 异常退出: {ex.Message}", LogLevel.Error);
+            }
+
+            await _logService.LogAsync("[聚合检查] 任务已停止", LogLevel.Debug);
+        }
+
         public void Dispose()
         {
             _ = StopMonitoringAsync();
@@ -779,6 +983,16 @@ namespace XUnity_LLMTranslatePlus.Services
         public string Status { get; set; } = "";
         public bool IsMonitoring { get; set; }
         public string? FilePath { get; set; }
+    }
+
+    /// <summary>
+    /// 文本观察记录（用于聚合打字机效果）
+    /// </summary>
+    internal class TextObservation
+    {
+        public string Text { get; set; } = "";
+        public DateTime FirstSeenTime { get; set; }
+        public DateTime LastUpdateTime { get; set; }
     }
 }
 
