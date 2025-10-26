@@ -36,6 +36,11 @@
     </Content>
   </ItemGroup>
 
+  <!-- 嵌入资源 - classdata.tpk Unity 类型数据库 -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\classdata.tpk" />
+  </ItemGroup>
+
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
@@ -52,6 +57,8 @@
   </ItemGroup>
   -->
   <ItemGroup>
+    <PackageReference Include="AssetsTools.NET" Version="3.0.2" />
+    <PackageReference Include="AssetsTools.NET.MonoCecil" Version="3.0.2" />
     <PackageReference Include="CsvHelper" Version="33.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.10" />

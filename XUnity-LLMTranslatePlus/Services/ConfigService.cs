@@ -152,7 +152,8 @@ namespace XUnity_LLMTranslatePlus.Services
                 EnableSmartTerminology = config.EnableSmartTerminology,
                 CurrentTerminologyFile = config.CurrentTerminologyFile,
                 EnableTextAggregation = config.EnableTextAggregation,
-                TextAggregationDelay = config.TextAggregationDelay
+                TextAggregationDelay = config.TextAggregationDelay,
+                AssetExtraction = config.AssetExtraction
             };
         }
 

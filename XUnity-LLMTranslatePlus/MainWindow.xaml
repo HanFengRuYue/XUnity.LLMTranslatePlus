@@ -75,6 +75,12 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
+                <NavigationViewItem Content="资产提取" Tag="AssetExtraction">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8B5;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
                 <NavigationViewItem Content="日志监控" Tag="Log">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE7BA;"/>

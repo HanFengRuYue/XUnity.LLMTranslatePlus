@@ -58,6 +58,9 @@ namespace XUnity_LLMTranslatePlus.Models
         // 自动刷新配置
         public bool EnableAutoRefresh { get; set; } = false; // 自动发送 ALT+R 刷新游戏翻译
         public int AutoRefreshInterval { get; set; } = 1; // 自动刷新间隔（秒），范围 1-60
+
+        // 资产提取配置
+        public AssetExtractionConfig AssetExtraction { get; set; } = new AssetExtractionConfig();
     }
 
     /// <summary>
@@ -90,6 +93,7 @@ namespace XUnity_LLMTranslatePlus.Models
         public string Timestamp { get; set; } = "";
         public string Level { get; set; } = "Info";
         public string Message { get; set; } = "";
+        public Windows.UI.Color LevelColor { get; set; }
     }
 }
 

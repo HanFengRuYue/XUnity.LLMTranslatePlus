@@ -1,0 +1,732 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using AssetsTools.NET;
+using AssetsTools.NET.Extra;
+using XUnity_LLMTranslatePlus.Models;
+
+namespace XUnity_LLMTranslatePlus.Services
+{
+    /// <summary>
+    /// 资产文本提取器
+    /// 使用 AssetsTools.NET 从 Unity 资产文件中提取文本
+    /// </summary>
+    public class AssetTextExtractor : IDisposable
+    {
+        private readonly LogService _logService;
+        private readonly AssetExtractionConfig _config;
+        private AssetsManager? _assetsManager;
+        private bool _isInitialized = false;
+        private bool _monoTempGeneratorSet = false;
+        private string? _gameDirectory;
+
+        public AssetTextExtractor(LogService logService, AssetExtractionConfig config)
+        {
+            _logService = logService;
+            _config = config;
+        }
+
+        /// <summary>
+        /// 初始化 AssetsManager 和 ClassDatabase
+        /// </summary>
+        private async Task InitializeAsync()
+        {
+            if (_isInitialized)
+                return;
+
+            try
+            {
+                _assetsManager = new AssetsManager();
+
+                // 启用性能优化（参考 UABEANext）
+                _assetsManager.UseTemplateFieldCache = true;
+                _assetsManager.UseQuickLookup = true;
+
+                // 加载 ClassPackage（类型数据库包）
+                // 简化加载逻辑：仅保留可靠的两种方式
+                // 优先级：1. 程序内嵌资源 -> 2. 用户配置路径
+                string? classdataPath = null;
+                bool loadedFromEmbedded = false;
+
+                // 1. 优先：从程序内嵌资源加载（最可靠）
+                try
+                {
+                    var assembly = Assembly.GetExecutingAssembly();
+                    var resourceName = "XUnity_LLMTranslatePlus.Resources.classdata.tpk";
+
+                    using (var stream = assembly.GetManifestResourceStream(resourceName))
+                    {
+                        if (stream != null)
+                        {
+                            // 提取到临时文件
+                            var tempPath = Path.Combine(Path.GetTempPath(), "XUnity_LLMTranslatePlus_classdata.tpk");
+                            using (var fileStream = File.Create(tempPath))
+                            {
+                                await stream.CopyToAsync(fileStream);
+                            }
+
+                            classdataPath = tempPath;
+                            loadedFromEmbedded = true;
+                            await _logService.LogAsync(
+                                "已从程序内嵌资源加载 ClassDatabase",
+                                LogLevel.Info);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await _logService.LogAsync(
+                        $"从内嵌资源加载 ClassDatabase 失败: {ex.Message}",
+                        LogLevel.Warning);
+                }
+
+                // 2. 备用：用户配置的路径（允许用户自定义）
+                if (!loadedFromEmbedded &&
+                    !string.IsNullOrWhiteSpace(_config.ClassDatabasePath) &&
+                    File.Exists(_config.ClassDatabasePath))
+                {
+                    classdataPath = _config.ClassDatabasePath;
+                    await _logService.LogAsync(
+                        $"已从用户配置路径加载 ClassDatabase: {Path.GetFileName(classdataPath)}",
+                        LogLevel.Info);
+                }
+
+                // 加载 ClassPackage（包含多个Unity版本的类型定义）
+                if (classdataPath != null)
+                {
+                    try
+                    {
+                        _assetsManager.LoadClassPackage(classdataPath);
+                        await _logService.LogAsync("ClassPackage 加载成功", LogLevel.Info);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new FileLoadException(
+                            $"ClassDatabase 加载失败: {ex.Message}。请检查程序完整性或手动指定有效的 classdata.tpk 文件。",
+                            ex);
+                    }
+                }
+                else
+                {
+                    throw new FileNotFoundException(
+                        "无法加载 ClassDatabase。程序内嵌资源未找到，且未配置用户路径。请检查程序完整性或手动指定 classdata.tpk 文件。");
+                }
+
+                // 尝试设置 MonoTempGenerator（用于没有 TypeTree 的 MonoBehaviour）
+                await SetupMonoTempGeneratorAsync();
+
+                _isInitialized = true;
+            }
+            catch (Exception ex)
+            {
+                await _logService.LogAsync($"初始化 AssetsManager 失败: {ex.Message}", LogLevel.Error);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 从资产文件列表中提取所有文本
+        /// </summary>
+        public async Task<List<ExtractedTextEntry>> ExtractTextsAsync(
+            string gameDirectory,
+            List<string> assetFilePaths,
+            IProgress<AssetScanProgress>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            _gameDirectory = gameDirectory;
+            await InitializeAsync();
+
+            var allExtractedTexts = new List<ExtractedTextEntry>();
+            int processedCount = 0;
+
+            foreach (var assetPath in assetFilePaths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    var texts = await ExtractFromSingleAssetAsync(assetPath, cancellationToken);
+                    allExtractedTexts.AddRange(texts);
+
+                    processedCount++;
+
+                    progress?.Report(new AssetScanProgress
+                    {
+                        TotalAssets = assetFilePaths.Count,
+                        ProcessedAssets = processedCount,
+                        ExtractedTexts = allExtractedTexts.Count,
+                        CurrentAsset = Path.GetFileName(assetPath)
+                    });
+
+                    await _logService.LogAsync(
+                        $"已处理 {Path.GetFileName(assetPath)}: 提取 {texts.Count} 条文本",
+                        LogLevel.Info);
+                }
+                catch (Exception ex)
+                {
+                    await _logService.LogAsync(
+                        $"处理资产文件失败 {Path.GetFileName(assetPath)}: {ex.Message}",
+                        LogLevel.Error);
+                    // 继续处理下一个文件
+                }
+            }
+
+            await _logService.LogAsync(
+                $"文本提取完成，共提取 {allExtractedTexts.Count} 条文本",
+                LogLevel.Info);
+
+            return allExtractedTexts;
+        }
+
+        /// <summary>
+        /// 从单个资产文件中提取文本
+        /// </summary>
+        private async Task<List<ExtractedTextEntry>> ExtractFromSingleAssetAsync(
+            string assetFilePath,
+            CancellationToken cancellationToken)
+        {
+            if (_assetsManager == null)
+                throw new InvalidOperationException("AssetsManager 未初始化");
+
+            var extractedTexts = new List<ExtractedTextEntry>();
+
+            try
+            {
+                // 尝试作为 Bundle 加载
+                BundleFileInstance? bundleInstance = null;
+                AssetsFileInstance? assetsFileInstance = null;
+
+                try
+                {
+                    bundleInstance = _assetsManager.LoadBundleFile(assetFilePath);
+
+                    // Bundle 文件，提取其中的资产文件
+                    for (int i = 0; i < bundleInstance.file.BlockAndDirInfo.DirectoryInfos.Count; i++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        try
+                        {
+                            var dirInfo = bundleInstance.file.BlockAndDirInfo.DirectoryInfos[i];
+
+                            // 跳过非 assets 文件（如 .resS, .resource 等资源文件）
+                            if (!dirInfo.Name.EndsWith(".assets", StringComparison.OrdinalIgnoreCase))
+                                continue;
+
+                            assetsFileInstance = _assetsManager.LoadAssetsFileFromBundle(bundleInstance, i);
+                            var texts = await ExtractFromAssetsFileAsync(assetsFileInstance, assetFilePath);
+                            extractedTexts.AddRange(texts);
+                        }
+                        catch (Exception ex)
+                        {
+                            await _logService.LogAsync(
+                                $"提取 Bundle 内资产失败 (索引 {i}): {ex.Message}",
+                                LogLevel.Warning);
+                        }
+                    }
+                }
+                catch
+                {
+                    // 不是 Bundle 文件，尝试作为普通资产文件加载
+                    assetsFileInstance = _assetsManager.LoadAssetsFile(assetFilePath);
+                    var texts = await ExtractFromAssetsFileAsync(assetsFileInstance, assetFilePath);
+                    extractedTexts.AddRange(texts);
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logService.LogAsync(
+                    $"加载资产文件失败: {ex.Message}",
+                    LogLevel.Warning);
+            }
+
+            return extractedTexts;
+        }
+
+        /// <summary>
+        /// 从 AssetsFileInstance 中提取文本
+        /// </summary>
+        private async Task<List<ExtractedTextEntry>> ExtractFromAssetsFileAsync(
+            AssetsFileInstance assetsFile,
+            string sourceAsset)
+        {
+            if (_assetsManager == null)
+                throw new InvalidOperationException("AssetsManager 未初始化");
+
+            var extractedTexts = new List<ExtractedTextEntry>();
+
+            try
+            {
+                // 尝试为该资产文件加载对应版本的 ClassDatabase（参考 UABEANext）
+                TryLoadClassDatabaseFromPackage(assetsFile.file);
+
+                // 提取 TextAsset
+                if (_config.ScanTextAssets)
+                {
+                    var textAssets = assetsFile.file.GetAssetsOfType(AssetClassID.TextAsset);
+                    foreach (var assetInfo in textAssets)
+                    {
+                        try
+                        {
+                            var baseField = _assetsManager.GetBaseField(assetsFile, assetInfo);
+                            var name = baseField["m_Name"].IsDummy ? "" : baseField["m_Name"].AsString;
+
+                            // 关键修复：m_Script 是 byte[] 类型，不是 string（参考 UABEANext）
+                            var scriptField = baseField["m_Script"];
+                            if (scriptField.IsDummy)
+                                continue;
+
+                            byte[] byteData = scriptField.AsByteArray;
+                            if (byteData == null || byteData.Length == 0)
+                                continue;
+
+                            // 解码为 UTF-8 文本
+                            string text = Encoding.UTF8.GetString(byteData);
+
+                            if (!string.IsNullOrWhiteSpace(text) && IsValidText(text))
+                            {
+                                extractedTexts.Add(new ExtractedTextEntry
+                                {
+                                    Text = text,
+                                    SourceAsset = sourceAsset,
+                                    AssetType = "TextAsset",
+                                    FieldName = $"m_Script ({name})"
+                                });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            await _logService.LogAsync(
+                                $"提取 TextAsset 失败: {ex.Message}",
+                                LogLevel.Debug);
+                        }
+                    }
+                }
+
+                // 提取 MonoBehaviour
+                if (_config.ScanMonoBehaviours)
+                {
+                    // 检查并设置 MonoTempGenerator（参考 UABEANext）
+                    await CheckAndSetMonoTempGeneratorsAsync(assetsFile);
+
+                    var monoBehaviours = assetsFile.file.GetAssetsOfType(AssetClassID.MonoBehaviour);
+                    foreach (var assetInfo in monoBehaviours)
+                    {
+                        // 安全地获取 BaseField（内部会捕获 MonoCecil 异常）
+                        var baseField = TryGetBaseFieldSafe(assetsFile, assetInfo);
+                        if (baseField == null)
+                            continue; // 跳过无法解析的 MonoBehaviour
+
+                        try
+                        {
+
+                            // 遍历配置的字段名
+                            foreach (var fieldName in _config.MonoBehaviourFields)
+                            {
+                                try
+                                {
+                                    var field = baseField[fieldName];
+                                    if (field != null && !field.IsDummy && field.TypeName == "string")
+                                    {
+                                        var text = field.AsString;
+                                        if (!string.IsNullOrWhiteSpace(text) && IsValidText(text))
+                                        {
+                                            extractedTexts.Add(new ExtractedTextEntry
+                                            {
+                                                Text = text,
+                                                SourceAsset = sourceAsset,
+                                                AssetType = "MonoBehaviour",
+                                                FieldName = fieldName
+                                            });
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    // 字段不存在，继续下一个
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // 字段访问异常（NullReferenceException已在TryGetBaseFieldSafe中处理）
+                            await _logService.LogAsync(
+                                $"提取 MonoBehaviour 字段失败 (PathId: {assetInfo.PathId}): {ex.Message}",
+                                LogLevel.Debug);
+                        }
+                    }
+                }
+
+                // 提取 GameObject 名称（可选）
+                if (_config.ScanGameObjectNames)
+                {
+                    var gameObjects = assetsFile.file.GetAssetsOfType(AssetClassID.GameObject);
+                    foreach (var assetInfo in gameObjects)
+                    {
+                        try
+                        {
+                            var baseField = _assetsManager.GetBaseField(assetsFile, assetInfo);
+                            var name = baseField["m_Name"].IsDummy ? "" : baseField["m_Name"].AsString;
+
+                            if (!string.IsNullOrWhiteSpace(name) && IsValidText(name))
+                            {
+                                extractedTexts.Add(new ExtractedTextEntry
+                                {
+                                    Text = name,
+                                    SourceAsset = sourceAsset,
+                                    AssetType = "GameObject",
+                                    FieldName = "m_Name"
+                                });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            await _logService.LogAsync(
+                                $"提取 GameObject 名称失败: {ex.Message}",
+                                LogLevel.Debug);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                await _logService.LogAsync(
+                    $"从资产文件提取文本失败: {ex.Message}",
+                    LogLevel.Warning);
+            }
+
+            return extractedTexts;
+        }
+
+        /// <summary>
+        /// 验证文本是否符合提取规则
+        /// </summary>
+        private bool IsValidText(string text)
+        {
+            // 长度检查
+            if (text.Length < _config.MinTextLength || text.Length > _config.MaxTextLength)
+                return false;
+
+            // 应用排除规则
+            foreach (var pattern in _config.ExcludePatterns)
+            {
+                try
+                {
+                    if (Regex.IsMatch(text, pattern))
+                        return false;
+                }
+                catch (Exception ex)
+                {
+                    _logService.Log($"正则表达式错误 ({pattern}): {ex.Message}", LogLevel.Warning);
+                }
+            }
+
+            // 语言过滤
+            if (!MatchesLanguageFilter(text))
+                return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// 检查文本是否匹配语言过滤器
+        /// </summary>
+        private bool MatchesLanguageFilter(string text)
+        {
+            var filter = _config.SourceLanguageFilter;
+
+            return filter switch
+            {
+                "全部语言" => true,
+                "中日韩（CJK）" => HasCJKCharacters(text),
+                "简体中文" => HasSimplifiedChineseCharacters(text),
+                "繁体中文" => HasTraditionalChineseCharacters(text),
+                "日语" => HasJapaneseCharacters(text),
+                "英语" => HasEnglishCharacters(text),
+                "韩语" => HasKoreanCharacters(text),
+                "俄语" => HasRussianCharacters(text),
+                _ => true // 未知过滤器，默认通过
+            };
+        }
+
+        /// <summary>
+        /// 检测文本是否包含中日韩字符
+        /// </summary>
+        private static bool HasCJKCharacters(string text)
+        {
+            // CJK 统一表意文字: \u4e00-\u9fff
+            // 日文平假名: \u3040-\u309f
+            // 日文片假名: \u30a0-\u30ff
+            // 韩文: \uac00-\ud7af
+            return Regex.IsMatch(text, @"[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]");
+        }
+
+        /// <summary>
+        /// 检测文本是否包含简体中文字符
+        /// </summary>
+        private static bool HasSimplifiedChineseCharacters(string text)
+        {
+            // 简体中文常用字范围（CJK 统一表意文字）
+            // 注：简繁体字符有重叠，这里使用启发式检测
+            return Regex.IsMatch(text, @"[\u4e00-\u9fa5]");
+        }
+
+        /// <summary>
+        /// 检测文本是否包含繁体中文字符
+        /// </summary>
+        private static bool HasTraditionalChineseCharacters(string text)
+        {
+            // 繁体中文扩展区（包含繁体专用字）
+            return Regex.IsMatch(text, @"[\u4e00-\u9fff]");
+        }
+
+        /// <summary>
+        /// 检测文本是否包含日语字符
+        /// </summary>
+        private static bool HasJapaneseCharacters(string text)
+        {
+            // 日文平假名: \u3040-\u309f
+            // 日文片假名: \u30a0-\u30ff
+            // 日文汉字: \u4e00-\u9faf (部分)
+            return Regex.IsMatch(text, @"[\u3040-\u309f\u30a0-\u30ff]");
+        }
+
+        /// <summary>
+        /// 检测文本是否包含英语字符
+        /// </summary>
+        private static bool HasEnglishCharacters(string text)
+        {
+            // 英文字母（大小写）
+            return Regex.IsMatch(text, @"[a-zA-Z]");
+        }
+
+        /// <summary>
+        /// 检测文本是否包含韩语字符
+        /// </summary>
+        private static bool HasKoreanCharacters(string text)
+        {
+            // 韩文字母（谚文）: \uac00-\ud7af
+            return Regex.IsMatch(text, @"[\uac00-\ud7af]");
+        }
+
+        /// <summary>
+        /// 检测文本是否包含俄语字符
+        /// </summary>
+        private static bool HasRussianCharacters(string text)
+        {
+            // 西里尔字母（俄语）: \u0400-\u04ff
+            return Regex.IsMatch(text, @"[\u0400-\u04ff]");
+        }
+
+        /// <summary>
+        /// 过滤并去重提取的文本
+        /// </summary>
+        public List<ExtractedTextEntry> FilterAndDeduplicateTexts(List<ExtractedTextEntry> texts)
+        {
+            // 按文本内容去重（保留第一次出现的来源）
+            var uniqueTexts = texts
+                .GroupBy(t => t.Text)
+                .Select(g => g.First())
+                .ToList();
+
+            _logService.Log(
+                $"去重前: {texts.Count} 条，去重后: {uniqueTexts.Count} 条",
+                LogLevel.Info);
+
+            return uniqueTexts;
+        }
+
+        /// <summary>
+        /// 尝试从 ClassPackage 中加载与资产文件版本匹配的 ClassDatabase（参考 UABEANext）
+        /// </summary>
+        private void TryLoadClassDatabaseFromPackage(AssetsFile file)
+        {
+            if (_assetsManager == null)
+                return;
+
+            // 如果已经有 ClassDatabase，跳过
+            if (_assetsManager.ClassDatabase != null)
+                return;
+
+            var fileVersion = file.Metadata.UnityVersion;
+
+            // 版本号无效，跳过
+            if (string.IsNullOrEmpty(fileVersion) || fileVersion == "0.0.0")
+                return;
+
+            try
+            {
+                _assetsManager.LoadClassDatabaseFromPackage(fileVersion);
+                _logService.Log(
+                    $"已为 Unity {fileVersion} 加载 ClassDatabase",
+                    LogLevel.Debug);
+            }
+            catch (Exception ex)
+            {
+                _logService.Log(
+                    $"无法加载 Unity {fileVersion} 的 ClassDatabase: {ex.Message}",
+                    LogLevel.Debug);
+            }
+        }
+
+        /// <summary>
+        /// 安全地获取 MonoBehaviour 的 BaseField，捕获所有 MonoCecil 异常
+        /// 使用 DebuggerNonUserCode 属性减少 VS 调试中断
+        /// </summary>
+        [System.Diagnostics.DebuggerNonUserCode]
+        [System.Diagnostics.DebuggerStepThrough]
+        private AssetTypeValueField? TryGetBaseFieldSafe(AssetsFileInstance fileInst, AssetFileInfo info)
+        {
+            if (_assetsManager == null)
+                return null;
+
+            try
+            {
+                // 尝试获取 BaseField（内部会调用 MonoCecilTempGenerator）
+                // 某些损坏的 MonoBehaviour 会导致 MonoCecil 抛出 NullReferenceException
+                return _assetsManager.GetBaseField(fileInst, info);
+            }
+            catch
+            {
+                // 捕获所有异常（包括 MonoCecil 的 NullReferenceException）
+                // 返回 null 表示该 MonoBehaviour 无法解析
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 设置 MonoTempGenerator 用于 MonoBehaviour 反序列化（参考 UABEANext）
+        /// 当资产文件没有 TypeTree 时需要此生成器
+        /// </summary>
+        private async Task<bool> SetupMonoTempGeneratorAsync()
+        {
+            if (_assetsManager == null || _monoTempGeneratorSet || string.IsNullOrEmpty(_gameDirectory))
+                return false;
+
+            _monoTempGeneratorSet = true;
+
+            try
+            {
+                // Unity 游戏的 Managed 文件夹可能在多个位置，按优先级尝试
+                List<string> searchPaths = new List<string>();
+
+                // 1. 优先：*_Data/Managed（Unity 标准位置）
+                var dataDirs = Directory.GetDirectories(_gameDirectory, "*_Data", SearchOption.TopDirectoryOnly);
+                foreach (var dataDir in dataDirs)
+                {
+                    searchPaths.Add(Path.Combine(dataDir, "Managed"));
+                }
+
+                // 2. 回退：游戏根目录/Managed（某些特殊打包方式）
+                searchPaths.Add(Path.Combine(_gameDirectory, "Managed"));
+
+                // 尝试每个路径
+                foreach (var managedDir in searchPaths)
+                {
+                    if (Directory.Exists(managedDir))
+                    {
+                        var dllFiles = Directory.GetFiles(managedDir, "*.dll");
+                        if (dllFiles.Length > 0)
+                        {
+                            _assetsManager.MonoTempGenerator = new MonoCecilTempGenerator(managedDir);
+                            await _logService.LogAsync(
+                                $"已设置 MonoCecilTempGenerator: {managedDir} ({dllFiles.Length} 个 DLL)",
+                                LogLevel.Info);
+                            return true;
+                        }
+                    }
+                }
+
+                // 未找到 Managed 文件夹，记录尝试的路径
+                var attemptedPaths = string.Join(", ", searchPaths.Select(p => $"'{Path.GetFileName(Path.GetDirectoryName(p))}/Managed'"));
+                await _logService.LogAsync(
+                    $"未找到 Managed 文件夹（已尝试: {attemptedPaths}），MonoBehaviour 提取将依赖 ClassDatabase 和 TypeTree",
+                    LogLevel.Warning);
+                return false;
+            }
+            catch (Exception ex)
+            {
+                await _logService.LogAsync(
+                    $"设置 MonoTempGenerator 失败: {ex.Message}",
+                    LogLevel.Warning);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 检查并设置 MonoTempGenerator（仅在需要时调用，参考 UABEANext）
+        /// 从资产文件所在目录查找 Managed 文件夹
+        /// </summary>
+        private async Task CheckAndSetMonoTempGeneratorsAsync(AssetsFileInstance fileInst)
+        {
+            if (_assetsManager == null || _monoTempGeneratorSet)
+                return;
+
+            // 仅当文件没有 TypeTree 时才需要 MonoTempGenerator
+            if (fileInst.file.Metadata.TypeTreeEnabled)
+                return;
+
+            _monoTempGeneratorSet = true;
+
+            try
+            {
+                // 使用 fileInst.path 获取资产文件实际路径（参考 UABEANext 的 PathUtils）
+                string assetPath = fileInst.path;
+
+                // 特殊处理内置资源（参考 UABEANext PathUtils.cs:47-50）
+                if (fileInst.name == "unity default resources" ||
+                    fileInst.name == "unity_builtin_extra")
+                {
+                    var parentDir = Path.GetDirectoryName(assetPath);
+                    if (!string.IsNullOrEmpty(parentDir))
+                        assetPath = parentDir;
+                }
+
+                // 从资产文件路径获取所在目录（通常是 *_Data 目录）
+                var assetDir = Path.GetDirectoryName(assetPath);
+                if (string.IsNullOrEmpty(assetDir))
+                {
+                    // 如果无法从资产文件获取目录，回退到游戏根目录搜索
+                    await SetupMonoTempGeneratorAsync();
+                    return;
+                }
+
+                // 在资产文件所在目录查找 Managed
+                var managedDir = Path.Combine(assetDir, "Managed");
+                if (Directory.Exists(managedDir))
+                {
+                    var dllFiles = Directory.GetFiles(managedDir, "*.dll");
+                    if (dllFiles.Length > 0)
+                    {
+                        _assetsManager.MonoTempGenerator = new MonoCecilTempGenerator(managedDir);
+                        await _logService.LogAsync(
+                            $"已设置 MonoCecilTempGenerator: {managedDir} ({dllFiles.Length} 个 DLL)",
+                            LogLevel.Info);
+                        return;
+                    }
+                }
+
+                // 如果资产目录中找不到，回退到游戏根目录搜索
+                await SetupMonoTempGeneratorAsync();
+            }
+            catch (Exception ex)
+            {
+                await _logService.LogAsync(
+                    $"检查 MonoTempGenerator 失败: {ex.Message}",
+                    LogLevel.Debug);
+            }
+        }
+
+        public void Dispose()
+        {
+            _assetsManager?.MonoTempGenerator?.Dispose();
+            _assetsManager?.UnloadAll();
+        }
+    }
+}

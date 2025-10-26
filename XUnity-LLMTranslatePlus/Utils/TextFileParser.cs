@@ -47,12 +47,28 @@ namespace XUnity_LLMTranslatePlus.Utils
         {
             if (string.IsNullOrEmpty(text))
                 return 0;
-            
+
             int count = 0;
             count += Regex.Matches(text, @"\\n").Count;
             count += Regex.Matches(text, @"\\r").Count;
             count += Regex.Matches(text, @"\\t").Count;
             return count;
+        }
+
+        /// <summary>
+        /// 转义特殊字符为 XUnity 文件格式（字面字符）
+        /// 将实际的特殊字符（如换行符）转换为字面的转义序列（如 \n 两个字符）
+        /// </summary>
+        private static string EscapeSpecialChars(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            return text
+                .Replace("\\", "\\\\")  // 反斜杠必须最先处理
+                .Replace("\n", "\\n")   // 实际换行符转为字面 \n
+                .Replace("\r", "\\r")   // 实际回车符转为字面 \r
+                .Replace("\t", "\\t");  // 实际制表符转为字面 \t
         }
 
         // 注意：以下方法已弃用，不适用于 XUnity 文件格式
@@ -273,9 +289,11 @@ namespace XUnity_LLMTranslatePlus.Utils
                 try
                 {
                     var outputLines = new List<string>();
+                    var processedKeys = new HashSet<string>(StringComparer.Ordinal);
 
                     lock (_lockObject)
                     {
+                        // 第一步：处理原文件中已存在的行
                         foreach (var line in _fileLines)
                         {
                             // 保留空行和注释
@@ -304,6 +322,9 @@ namespace XUnity_LLMTranslatePlus.Utils
 
                                 string key = keySpan.ToString();
 
+                                // 记录已处理的键
+                                processedKeys.Add(key);
+
                                 // 如果有更新的翻译，使用新的值
                                 if (_translations.TryGetValue(key, out string? newValue))
                                 {
@@ -324,6 +345,24 @@ namespace XUnity_LLMTranslatePlus.Utils
                             {
                                 // 不是键值对，保持原样
                                 outputLines.Add(line);
+                            }
+                        }
+
+                        // 第二步：追加新增的翻译（在 _translations 中但不在原文件中）
+                        foreach (var kvp in _translations)
+                        {
+                            if (!processedKeys.Contains(kvp.Key))
+                            {
+                                // 转义特殊字符（将实际的 \n 转为字面的 \n）
+                                string escapedKey = EscapeSpecialChars(kvp.Key);
+                                string escapedValue = EscapeSpecialChars(kvp.Value);
+
+                                // 如果值包含空格或制表符，使用引号包裹
+                                string newLine = escapedValue.Contains(' ') || escapedValue.Contains('\t')
+                                    ? $"{escapedKey}=\"{escapedValue}\""
+                                    : $"{escapedKey}={escapedValue}";
+
+                                outputLines.Add(newLine);
                             }
                         }
                     }
@@ -403,6 +442,119 @@ namespace XUnity_LLMTranslatePlus.Utils
             {
                 return new Dictionary<string, string>(_translations);
             }
+        }
+
+        /// <summary>
+        /// 直接保存翻译（不依赖 _fileLines，用于创建新文件或完全重写）
+        /// </summary>
+        public async Task SaveTranslationsDirectAsync(
+            string filePath,
+            Dictionary<string, string> translations,
+            CancellationToken cancellationToken = default)
+        {
+            // 验证文件路径
+            string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
+
+            // 确保目录存在
+            string? directory = Path.GetDirectoryName(validatedPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            const int maxRetries = 5;
+            int retryCount = 0;
+            Random random = new Random();
+
+            while (retryCount < maxRetries)
+            {
+                try
+                {
+                    // 使用 FileShare.Read 允许其他进程同时读取
+                    await using (var fileStream = new FileStream(
+                        validatedPath,
+                        FileMode.Create,
+                        FileAccess.Write,
+                        FileShare.Read,
+                        4096,
+                        FileOptions.Asynchronous))
+                    {
+                        await using (var writer = new StreamWriter(fileStream, Encoding.UTF8))
+                        {
+                            // 写入文件头注释
+                            await writer.WriteLineAsync("// XUnity Auto Generated Translations");
+                            await writer.WriteLineAsync($"// Generated at: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                            await writer.WriteLineAsync("");
+
+                            // 按键排序写入所有翻译
+                            foreach (var kvp in translations.OrderBy(x => x.Key))
+                            {
+                                // 格式：key=value
+                                // 转义特殊字符（将实际的 \n 转为字面的 \n）
+                                string key = EscapeSpecialChars(kvp.Key);
+                                string value = EscapeSpecialChars(kvp.Value);
+
+                                // 如果值包含空格或制表符，使用引号包裹
+                                if (value.Contains(' ') || value.Contains('\t'))
+                                {
+                                    await writer.WriteLineAsync($"{key}=\"{value}\"");
+                                }
+                                else
+                                {
+                                    await writer.WriteLineAsync($"{key}={value}");
+                                }
+                            }
+                        }
+                    }
+
+                    // 写入成功，更新内部状态
+                    lock (_lockObject)
+                    {
+                        _translations = new Dictionary<string, string>(translations);
+                        // 同步更新 _fileLines 以便后续 SaveFileAsync 可用
+                        _fileLines = new List<string>();
+                        _fileLines.Add("// XUnity Auto Generated Translations");
+                        _fileLines.Add($"// Generated at: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                        _fileLines.Add("");
+                        foreach (var kvp in translations.OrderBy(x => x.Key))
+                        {
+                            string key = kvp.Key;
+                            string value = kvp.Value;
+                            if (value.Contains(' ') || value.Contains('\t'))
+                            {
+                                _fileLines.Add($"{key}=\"{value}\"");
+                            }
+                            else
+                            {
+                                _fileLines.Add($"{key}={value}");
+                            }
+                        }
+                    }
+
+                    return;
+                }
+                catch (IOException) when (retryCount < maxRetries - 1)
+                {
+                    // 文件被占用，等待后重试
+                    retryCount++;
+                    int delayMs = random.Next(200, 1000);
+                    await Task.Delay(delayMs, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    throw new FileOperationException(
+                        $"直接保存文件失败: {ex.Message}",
+                        ex,
+                        filePath,
+                        "SaveDirect");
+                }
+            }
+
+            // 重试次数用尽
+            throw new FileOperationException(
+                $"直接保存文件失败: 文件被占用，已重试 {maxRetries} 次",
+                filePath,
+                "SaveDirect");
         }
 
         /// <summary>

@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="XUnity_LLMTranslatePlus.Views.AssetExtractionPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid>
+        <!-- 主内容区 -->
+        <ScrollViewer Padding="0,0,16,0" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="16" Margin="0,0,0,24" HorizontalAlignment="Stretch">
+                <!-- 页面标题 -->
+                <TextBlock Text="Unity 资产文本提取" Style="{StaticResource TitleTextBlockStyle}"/>
+
+                <!-- 信息提示 -->
+                <InfoBar Severity="Informational"
+                         IsOpen="True"
+                         IsClosable="False"
+                         Message="从游戏资产文件中预先提取和翻译文本，配合实时监控功能提升翻译效率"/>
+
+                <!-- 扫描设置 -->
+                <Expander Header="扫描设置" IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
+                        <!-- 基本扫描选项 -->
+                        <CheckBox x:Name="ScanTextAssetsCheckBox"
+                                  Content="扫描 TextAsset（对话、配置文件）"
+                                  IsChecked="True"/>
+                        <CheckBox x:Name="ScanMonoBehavioursCheckBox"
+                                  Content="扫描 MonoBehaviour（自定义脚本）"
+                                  IsChecked="True"/>
+
+                        <!-- 语言过滤 -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="源语言过滤"/>
+                            <ComboBox x:Name="SourceLanguageComboBox"
+                                      SelectedIndex="0"
+                                      HorizontalAlignment="Stretch"
+                                      SelectionChanged="SourceLanguageComboBox_SelectionChanged">
+                                <ComboBoxItem Content="全部语言"/>
+                                <ComboBoxItem Content="中日韩（CJK）"/>
+                                <ComboBoxItem Content="简体中文"/>
+                                <ComboBoxItem Content="繁体中文"/>
+                                <ComboBoxItem Content="日语"/>
+                                <ComboBoxItem Content="英语"/>
+                                <ComboBoxItem Content="韩语"/>
+                                <ComboBoxItem Content="俄语"/>
+                            </ComboBox>
+                            <TextBlock Text="选择要提取的游戏文本语言。默认提取所有语言的文本。"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Opacity="0.6"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- ClassDatabase 文件选择 -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="ClassDatabase 文件（可选）" Style="{StaticResource BodyTextBlockStyle}" Opacity="0.7"/>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBox x:Name="ClassDatabasePathTextBox"
+                                         Grid.Column="0"
+                                         PlaceholderText="未指定（将使用程序内置的 classdata.tpk）"
+                                         IsReadOnly="True"/>
+                                <Button x:Name="BrowseClassDatabaseButton"
+                                        Grid.Column="1"
+                                        Content="浏览"
+                                        Click="BrowseClassDatabaseButton_Click"/>
+                                <Button x:Name="ClearClassDatabaseButton"
+                                        Grid.Column="2"
+                                        Content="清除"
+                                        Click="ClearClassDatabaseButton_Click"/>
+                            </Grid>
+                            <TextBlock Text="程序已内置 classdata.tpk，通常无需手动指定。仅在需要使用自定义版本时选择。"
+                                       Style="{StaticResource CaptionTextBlockStyle}"
+                                       Opacity="0.6"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+
+                <!-- MonoBehaviour 字段名管理 -->
+                <Expander Header="MonoBehaviour 字段名管理" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                    <StackPanel Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Stretch">
+                        <!-- 工具栏 -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Click="AddFieldButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE710;" FontSize="14"/>
+                                    <TextBlock Text="添加字段"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="DeleteFieldButton" Click="DeleteFieldButton_Click" IsEnabled="False">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="14"/>
+                                    <TextBlock Text="删除"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock x:Name="FieldCountText"
+                                       Text=""
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,0"
+                                       Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
+                        </StackPanel>
+
+                        <!-- 字段名列表 -->
+                        <ListView x:Name="FieldNamesListView"
+                                  Height="200"
+                                  BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                  BorderThickness="1"
+                                  CornerRadius="4"
+                                  SelectionMode="Extended"
+                                  SelectionChanged="FieldNamesListView_SelectionChanged">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.HeaderTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="16,8" MinHeight="40">
+                                        <TextBlock Text="字段名" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.HeaderTemplate>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="16,12" MinHeight="48">
+                                        <TextBox Text="{Binding FieldName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 VerticalAlignment="Center"
+                                                 PlaceholderText="字段名（如：text, message, content）"
+                                                 BorderThickness="1"
+                                                 TextChanged="FieldNameTextBox_TextChanged"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <InfoBar Severity="Informational"
+                                 IsOpen="True"
+                                 IsClosable="False"
+                                 Message="配置要从 MonoBehaviour 中提取的字段名。常用字段名已预设，您可以添加自定义字段以适应不同游戏。"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- 操作按钮 -->
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button x:Name="ScanButton" Click="ScanButton_Click" Style="{StaticResource AccentButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE721;" FontSize="16"/>
+                            <TextBlock Text="开始扫描"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button x:Name="TranslateButton" Click="TranslateButton_Click" IsEnabled="False">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE8C1;" FontSize="16"/>
+                            <TextBlock Text="开始翻译"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button x:Name="CancelButton" Click="CancelButton_Click" IsEnabled="False">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE711;" FontSize="16"/>
+                            <TextBlock Text="取消"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- 进度显示 -->
+                <StackPanel Spacing="8" x:Name="ProgressPanel" Visibility="Collapsed">
+                    <TextBlock x:Name="ProgressText" Style="{StaticResource BodyTextBlockStyle}"/>
+                    <ProgressBar x:Name="ProgressBar" IsIndeterminate="False"/>
+                </StackPanel>
+
+                <!-- 统计信息 -->
+                <Grid x:Name="StatsGrid" Visibility="Collapsed" ColumnSpacing="12" RowSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="扫描资产:" Opacity="0.7"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" x:Name="AssetCountText" Text="0"/>
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="提取文本:" Opacity="0.7"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" x:Name="ExtractedTextCountText" Text="0"/>
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="成功翻译:" Opacity="0.7"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TranslatedCountText" Text="0"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="失败:" Opacity="0.7"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="FailedCountText" Text="0"/>
+                </Grid>
+
+                <!-- 提取文本列表 -->
+                <StackPanel x:Name="ExtractedTextsPanel" Visibility="Collapsed" Spacing="12" Margin="0,12,0,0">
+                    <TextBlock Text="提取的文本" Style="{StaticResource SubtitleTextBlockStyle}"/>
+
+                    <!-- 搜索和筛选 -->
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox x:Name="SearchTextBox"
+                                 Grid.Column="0"
+                                 PlaceholderText="搜索文本或来源文件..."
+                                 TextChanged="SearchTextBox_TextChanged">
+                            <TextBox.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="F" Modifiers="Control"/>
+                            </TextBox.KeyboardAccelerators>
+                        </TextBox>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="SelectAllButton" Content="全选" Click="SelectAllButton_Click"/>
+                            <Button x:Name="DeselectAllButton" Content="取消全选" Click="DeselectAllButton_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 统计 -->
+                    <TextBlock x:Name="ExtractedTextsStats"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Opacity="0.7"/>
+
+                    <!-- 文本列表 -->
+                    <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Height="400">
+                        <ListView x:Name="ExtractedTextsListView"
+                                  SelectionMode="Extended"
+                                  SelectionChanged="ExtractedTextsListView_SelectionChanged">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.HeaderTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="12,8" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="3*" MinWidth="200"/>
+                                            <ColumnDefinition Width="2*" MinWidth="150"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="120"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0" Text="原文" FontWeight="SemiBold" Opacity="0.7"/>
+                                        <TextBlock Grid.Column="1" Text="来源文件" FontWeight="SemiBold" Opacity="0.7"/>
+                                        <TextBlock Grid.Column="2" Text="类型" FontWeight="SemiBold" Opacity="0.7"/>
+                                        <TextBlock Grid.Column="3" Text="字段名" FontWeight="SemiBold" Opacity="0.7"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.HeaderTemplate>
+
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Padding="12,8" ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="3*" MinWidth="200"/>
+                                            <ColumnDefinition Width="2*" MinWidth="150"/>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="120"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Text}"
+                                                   TextWrapping="Wrap"
+                                                   ToolTipService.ToolTip="{Binding Text}"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding SourceAsset}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTipService.ToolTip="{Binding SourceAsset}"/>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding AssetType}"/>
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding FieldName}"
+                                                   Opacity="{Binding FieldNameOpacity}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
+                </StackPanel>
+
+                <!-- 自动保存提示 -->
+                <InfoBar Severity="Informational"
+                         IsOpen="True"
+                         IsClosable="False"
+                         Message="所有配置更改将自动保存，日志统一显示在【日志监控】页面"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

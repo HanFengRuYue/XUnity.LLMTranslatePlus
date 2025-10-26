@@ -233,7 +233,101 @@ services.AddSingleton<FileMonitorService>();
 services.AddSingleton<TextEditorService>();
 ```
 
-Pages resolve via: `App.Current.Services.GetService<LogService>()`
+Pages resolve via: `App.GetService<LogService>()`
+
+### Unity Asset Extraction (NEW)
+
+**Architecture** (AssetScannerService.cs, AssetTextExtractor.cs, PreTranslationService.cs):
+- **Mixed-mode approach**: Pre-extract static texts from Unity assets + Real-time monitoring for dynamic texts
+- Uses **AssetsTools.NET 3.0.2** and **AssetsTools.NET.MonoCecil 3.0.2** libraries
+
+**Workflow**:
+```
+1. Scan game directory → Find .assets, .bundle, .unity3d files
+2. Extract texts → TextAsset, MonoBehaviour fields, GameObject names
+3. Filter texts → CJK character detection, regex exclusions
+4. Translate batch → Use existing TranslationService with Channel<T> concurrency
+5. Merge → Combine with existing XUnity translation file
+6. Real-time monitoring → FileMonitorService handles dynamic texts
+```
+
+**Key Components**:
+- **AssetScannerService**: Scans game directory recursively for Unity asset files
+- **AssetTextExtractor**: Extracts text using AssetsTools.NET, filters with configurable rules
+- **PreTranslationService**: Coordinates scan→extract→translate→merge pipeline
+
+**Configuration** (AssetExtractionConfig):
+- `ScanTextAssets`: Extract TextAsset.m_Script (dialogues, configs)
+- `ScanMonoBehaviours`: Extract custom script fields (configurable field names)
+- `MonoBehaviourFields`: List of field names to extract (text, dialogText, description, etc.)
+  - Default fields: text, dialogText, description, itemName, tooltipText, message, content, title, subtitle
+  - User-configurable via UI field name management
+- `SourceLanguageFilter`: Language filter for text extraction (default: "全部语言")
+  - Options: 全部语言, 中日韩（CJK）, 简体中文, 繁体中文, 日语, 英语, 韩语, 俄语
+  - Uses Unicode range detection for precise filtering
+- `ExcludePatterns`: Regex patterns to filter out paths, variable names, etc.
+- `OverwriteExisting`: Whether to re-translate existing translations
+- `ClassDatabasePath`: User-selected path to classdata.tpk file (optional, configured via UI file picker)
+
+**Critical Implementation Details**:
+- `IsDummy` is a **property**, not a method: `field.IsDummy` (not `field.IsDummy()`)
+- **ClassDatabase Loading** (UPDATED 2025-01):
+  - **Embedded Resource Priority**: classdata.tpk is now embedded in the executable as `Resources/classdata.tpk`
+  - Uses `LoadClassPackage()` NOT `LoadClassDatabase()` - loads multi-version .tpk package
+  - **Simplified Loading Priority** (reliable methods only):
+    1. **Program Embedded Resource** (PRIMARY) - Extracted from assembly to temp file, always available
+    2. **User-Configured Path** (BACKUP) - Optional custom classdata.tpk via UI file picker
+  - **Removed unreliable methods**: AppData default path and asset built-in TypeTree fallback
+  - Fails fast with clear error message if both methods fail
+  - Then calls `LoadClassDatabaseFromPackage(unityVersion)` for each asset file to load version-specific types
+  - Performance optimizations enabled: `UseTemplateFieldCache`, `UseQuickLookup`
+- **TextAsset extraction** (CRITICAL):
+  - `m_Script` field is **byte[] NOT string** - use `AsByteArray` then `Encoding.UTF8.GetString()`
+  - Previous `AsString` approach failed silently, causing 0 text extraction
+  - Pattern: `var bytes = field["m_Script"].AsByteArray; string text = Encoding.UTF8.GetString(bytes);`
+- **MonoBehaviour extraction with MonoCecilTempGenerator**:
+  - **CRITICAL**: Use `fileInst.path` NOT string parameter for Managed folder path (AssetTextExtractor.cs:586-587)
+  - Managed folder search paths (AssetTextExtractor.cs:519-563):
+    1. `*_Data/Managed` (Unity standard, e.g., `GameName_Data/Managed`)
+    2. `GameRoot/Managed` (fallback for special packaging)
+  - MonoCecilTempGenerator requires game DLL files from Managed folder
+  - **Special handling** for internal resources: `"unity default resources"`, `"unity_builtin_extra"` (move up one directory level)
+  - Only set MonoTempGenerator when `TypeTreeEnabled == false` (optimization)
+- **Handling Third-Party Library Exceptions** (AssetTextExtractor.cs:490-513):
+  - AssetsTools.NET.MonoCecil may throw NullReferenceException for corrupted MonoBehaviour types
+  - Use `[DebuggerNonUserCode]` and `[DebuggerStepThrough]` attributes to reduce VS debugging interruptions
+  - Wrap all MonoCecil calls in `TryGetBaseFieldSafe()` method with try-catch returning null
+  - This is expected behavior - some MonoBehaviour instances may reference deleted/corrupted scripts
+- **UI Features** (AssetExtractionPage - UPDATED 2025-01):
+  - **Page State Persistence**: Uses `NavigationCacheMode.Required` to preserve all state when navigating away
+    - Extracted texts list retained
+    - Scan configuration preserved
+    - User selections maintained
+    - Statistics persist
+  - **Non-blocking UI**: All heavy operations run in `Task.Run` with loading overlay
+    - ProgressRing with status messages
+    - Background thread execution prevents UI freeze
+    - Cancellation support via CancellationToken
+  - **Field Name Management**: Similar to terminology management UI
+    - ListView with editable TextBox for each field
+    - Add/Delete buttons with selection management
+    - Auto-save with 800ms debounce
+  - **Language Filtering**: ComboBox for source language selection (全部语言, 中日韩, 简中, 繁中, 日语, 英语, 韩语, 俄语)
+  - ListView displays extracted texts with: Text, Source File, Asset Type, Field Name
+  - Search functionality (Ctrl+F) filters by text content or source file
+  - Select All / Deselect All buttons for batch selection
+  - Only selected texts are translated (selective translation)
+  - Real-time statistics: total/filtered/selected counts
+  - ClassDatabase file picker integrated in UI (Browse/Clear buttons) - optional, uses embedded version by default
+  - **Operation Log**: Collapsible Expander with styled log entries (timestamp + level badge + message)
+  - **Consistent Layout**: Matches other pages (padding, spacing, Expander styles)
+- Users can select classdata.tpk file directly in AssetExtractionPage UI (optional - program has embedded version)
+- Uses `FileShare.ReadWrite` for reading assets to allow concurrent access
+- TextExtractor is `IDisposable` - create with `using` statement
+- Batch translation reuses existing Channel<T> + TranslationService architecture
+
+**Pages**:
+- AssetExtractionPage - Scan, extract, translate UI with complete text list, search, and selective translation
 
 ## UI Patterns
 
@@ -302,6 +396,7 @@ private void TriggerAutoSave()
 - TranslationSettingsPage - Game directory, language, context, system prompt
 - TerminologyPage - Terminology CRUD, file management, smart extraction toggle
 - TextEditorPage - Manual editing, CSV import/export
+- AssetExtractionPage - Unity asset scanning, text extraction, selective translation with search
 - LogPage - Real-time logs with filtering
 - AboutPage - App info, reset config (in footer)
 
@@ -343,6 +438,24 @@ private void TriggerAutoSave()
 
 18. **Rate Limiting Resilience**: HTTP 429 errors are transient and should use exponential backoff (not linear). They should NOT increment `TotalFailed` or count toward `ErrorThreshold` since they automatically recover with proper delays. Use `RateLimitException` for special handling.
 
+19. **Unity Asset Path Resolution**: When working with AssetsFileInstance, ALWAYS use `fileInst.path` property to get the actual asset file path, NOT the string parameter passed to loading methods. When loading from bundles, the parameter is the bundle path, but `fileInst.path` is the actual .assets file path inside. This is critical for Managed folder discovery (AssetTextExtractor.cs:586-587).
+
+20. **Third-Party Library Exception Handling**: When wrapping third-party library calls that may throw exceptions in debug mode (like AssetsTools.NET.MonoCecil), use `[DebuggerNonUserCode]` and `[DebuggerStepThrough]` attributes on wrapper methods. This tells Visual Studio to skip breaking on first-chance exceptions in that code, improving debugging experience. Combine with try-catch returning null for graceful handling (AssetTextExtractor.cs:494-495).
+
+21. **MonoCecilTempGenerator Path Logic**: The Managed folder is NOT in the game root directory. For Unity games, it's in `GameName_Data/Managed`. Extract path from `fileInst.path`, handle special cases for internal resources (`"unity default resources"`, `"unity_builtin_extra"` need parent directory), and support multiple fallback paths (*_Data/Managed → Root/Managed). Reference UABEANext's PathUtils.GetAssetsFileDirectory() implementation (AssetTextExtractor.cs:573-631).
+
+22. **Page State Persistence** (UPDATED 2025-01): For pages that need to retain state across navigation (like AssetExtractionPage), ALWAYS set `NavigationCacheMode.Required` in the constructor. Without this, all extracted texts, selections, and configurations are lost when user navigates away. Must be set BEFORE page is displayed: `this.NavigationCacheMode = NavigationCacheMode.Required;`
+
+23. **Embedded Resources Loading**: When loading embedded resources (like classdata.tpk), extract to temp file first, don't use stream directly with third-party libraries. Pattern: `var tempPath = Path.Combine(Path.GetTempPath(), "unique_name.tpk"); stream.CopyToAsync(fileStream);` This ensures compatibility with libraries that expect file paths.
+
+24. **Language Filtering Implementation**: Use pattern matching (`switch` expression) with `MatchesLanguageFilter()` method for maintainability. Each language has specific Unicode range check. Always provide "全部语言" (All Languages) default to support multi-language games. Never filter by default unless user explicitly configures it.
+
+25. **Shared Model Classes**: When multiple pages use the same data model (like `LogEntry`), define it ONCE in Models namespace and add necessary UI-specific properties (like `LevelColor` for colored badges). Avoid duplicate class definitions in Views namespace to prevent type conflicts and compilation errors.
+
+26. **TextFileParser.SaveFileAsync Must Append New Translations** (CRITICAL): When saving translations, the method MUST append new entries not present in `_fileLines`. Only iterating through `_fileLines` will silently lose all new translations. Always maintain a `HashSet<string> processedKeys` during file line iteration, then iterate `_translations` dictionary to append any keys NOT in `processedKeys`. Failing to do this causes complete data loss of new translations (TextFileParser.cs:273-368).
+
+27. **XUnity File Format Special Character Escaping** (CRITICAL): Keys and values containing actual special characters (newline `\n`, tab `\t`, etc.) MUST be escaped to literal sequences before writing. Use `EscapeSpecialChars()` to convert actual `\n` character → literal `\n` (backslash + n, two characters). Without escaping, `WriteLineAsync()` splits entries across multiple lines, corrupting the file format. XUnity expects: `\n` = two literal characters, NOT actual newline. Apply escaping in both `SaveFileAsync` and `SaveTranslationsDirectAsync` (TextFileParser.cs:58-72, 357-358, 490-491).
+
 ## Performance Notes
 
 - **Concurrent Limits**: Default 3, max 100. Higher values may hit rate limits.
@@ -364,3 +477,193 @@ private void TriggerAutoSave()
 - Catch specific types first (e.g., `RateLimitException`), then base types
 - `RateLimitException` should trigger exponential backoff, NOT count toward error threshold
 - Never swallow exceptions without logging
+
+## Recent Updates
+
+### 2025-01-27: Asset Extraction Page Improvements
+
+**Major Refactoring** - 10 improvements to enhance stability, usability, and consistency:
+
+1. **Page State Persistence** ✓
+   - Implemented `NavigationCacheMode.Required` for state preservation
+   - Extracted texts, configurations, selections, and statistics now persist across navigation
+   - Eliminates need to re-scan after switching pages
+
+2. **Embedded ClassDatabase** ✓
+   - classdata.tpk now embedded as `Resources/classdata.tpk` (1.3MB)
+   - Simplified loading: Embedded resource (primary) → User path (backup)
+   - Removed unreliable AppData and TypeTree fallback methods
+   - More stable, predictable behavior
+
+3. **Non-Blocking UI** ✓
+   - All heavy operations moved to background threads with `Task.Run`
+   - Added loading overlay with ProgressRing and status messages
+   - Full cancellation support with CancellationToken
+   - UI remains responsive during long scans/extractions
+
+4. **Improved Text List Display** ✓
+   - Redesigned to match terminology management page style
+   - Multi-column layout: Text (3*) | Source (2*) | Type (100px) | Field (120px)
+   - Enhanced search with Ctrl+F support
+   - Selection statistics and batch operations
+
+5. **Consistent Layout** ✓
+   - Fixed Expander width issues (`HorizontalAlignment="Stretch"`)
+   - Unified padding/margins across all pages
+   - Standardized title styles and spacing
+   - Professional, cohesive design
+
+6. **Unified Operation Log** ✓
+   - Styled log entries matching LogPage design
+   - Timestamp + colored level badge + message
+   - Collapsible Expander with CardBackgroundFillColorDefaultBrush
+   - Consistent typography and spacing
+
+7. **Language Filtering** ✓
+   - Replaced boolean `IgnoreEnglishOnly` with flexible `SourceLanguageFilter`
+   - ComboBox with 8 options: All, CJK, Simplified/Traditional Chinese, Japanese, English, Korean, Russian
+   - Unicode range detection for precise filtering
+   - Supports games in any language
+
+8. **Field Name Management** ✓
+   - Similar UI to terminology management
+   - Editable ListView with add/delete functionality
+   - Auto-save with 800ms debounce
+   - Default fields: text, dialogText, description, itemName, tooltipText, message, content, title, subtitle
+
+9. **Operation Log as Expander** ✓
+   - Wrapped in collapsible Expander component
+   - Default expanded for visibility
+   - Height-limited with scroll
+   - Matches design of other collapsible sections
+
+10. **Page Margins and Styling** ✓
+    - ScrollViewer: `Padding="0,0,16,0"`
+    - StackPanel: `Spacing="16"`, `Margin="0,0,0,24"`
+    - Consistent with all other application pages
+
+**Files Modified**: 8 files (~1000+ lines)
+- AssetExtractionPage.xaml (complete redesign)
+- AssetExtractionPage.xaml.cs (full refactor with state management)
+- AssetExtractionConfig.cs (language filter property)
+- AssetTextExtractor.cs (simplified loading + language detection)
+- AppConfig.cs (added LevelColor to LogEntry)
+- XUnity-LLMTranslatePlus.csproj (embedded resource)
+- Resources/classdata.tpk (new embedded file)
+
+**Build Status**: ✅ Successful compilation with minimal warnings
+
+**Impact**: Significantly improved user experience with persistent state, non-blocking operations, and consistent UI design across the application.
+
+---
+
+### 2025-01-27: Critical Bug Fixes for Asset Extraction Translation Save
+
+**Major Bug Fixes** - Resolved critical issues preventing translations from being saved correctly:
+
+**Issue #1: New Translations Not Being Saved (CRITICAL)**
+
+*Problem*:
+- Users reported translations were logged as saved but missing from file
+- Evidence: Log showed "520 translations saved" but file only contained 338 entries
+- **182 translations were lost** completely
+
+*Root Cause*:
+- `TextFileParser.SaveFileAsync` only processed lines from `_fileLines` (original file content)
+- New translations in `_translations` dictionary but not in `_fileLines` were **silently ignored**
+- Method iterated through existing file lines, updated matching keys, but never appended new entries
+
+*Solution* (TextFileParser.cs:273-368):
+```csharp
+// Step 1: Process existing file lines (update or keep unchanged)
+var processedKeys = new HashSet<string>(StringComparer.Ordinal);
+foreach (var line in _fileLines)
+{
+    // ... process and record keys in processedKeys
+}
+
+// Step 2: Append NEW translations (critical addition!)
+foreach (var kvp in _translations)
+{
+    if (!processedKeys.Contains(kvp.Key))  // New translation
+    {
+        string newLine = kvp.Value.Contains(' ') || kvp.Value.Contains('\t')
+            ? $"{kvp.Key}=\"{kvp.Value}\""
+            : $"{kvp.Key}={kvp.Value}";
+        outputLines.Add(newLine);
+    }
+}
+```
+
+**Issue #2: Key-Value Pairs Split Across Lines**
+
+*Problem*:
+- Some entries appeared as:
+  ```
+  これでバックアップデータを読み込む準備はできたわ
+  =这样读取备份数据的准备工作就完成了
+  ```
+- Should be single line: `これでバックアップデータを読み込む準備はできたわ=这样读取备份数据的准备工作就完成了`
+
+*Root Cause*:
+- Keys or values contained **actual newline characters** (`\n`)
+- `WriteLineAsync` wrote these as real line breaks instead of escaped sequences
+- XUnity format requires: `\n` = literal two characters (backslash + n), NOT actual newline
+
+*Solution* (TextFileParser.cs:58-72):
+
+Added escape method:
+```csharp
+/// <summary>
+/// Escape special characters to XUnity file format (literal characters)
+/// Converts actual special chars (e.g. newline) to literal escape sequences (e.g. \n as two chars)
+/// </summary>
+private static string EscapeSpecialChars(string text)
+{
+    if (string.IsNullOrEmpty(text))
+        return text;
+
+    return text
+        .Replace("\\", "\\\\")  // Backslash must be first
+        .Replace("\n", "\\n")   // Actual newline → literal \n
+        .Replace("\r", "\\r")   // Actual carriage return → literal \r
+        .Replace("\t", "\\t");  // Actual tab → literal \t
+}
+```
+
+Applied in both save methods:
+- `SaveTranslationsDirectAsync` (line 490-491)
+- `SaveFileAsync` (line 357-358)
+
+**Results**:
+- ✅ All 520 translations now saved correctly (0 lost)
+- ✅ All key-value pairs on single lines
+- ✅ Complies with XUnity file format specification
+- ✅ Special characters properly escaped
+
+**Additional Improvements from Same Session**:
+
+1. **Removed Redundant Operation Log**
+   - Deleted separate log UI from AssetExtractionPage
+   - All logs now unified in "Log Monitor" page
+   - Simplified UI, reduced code duplication
+
+2. **Simplified Loading UI**
+   - Removed full-screen `LoadingOverlay`
+   - Replaced with lightweight `ProgressPanel` + `ProgressBar`
+   - Non-intrusive progress display
+
+3. **Optimized Concurrency Configuration**
+   - Changed from fixed `BatchConcurrency=3` to dynamic calculation
+   - Now uses sum of all enabled API endpoints' `MaxConcurrent` (capped at 100)
+   - Example: 1 endpoint with MaxConcurrent=64 → uses 64 concurrent tasks
+   - Matches `FileMonitorService` behavior for consistency
+
+**Files Modified**: 3 files
+- TextFileParser.cs (added EscapeSpecialChars, fixed SaveFileAsync, fixed SaveTranslationsDirectAsync)
+- PreTranslationService.cs (optimized concurrency calculation, improved merge logic)
+- AssetExtractionPage.xaml + .cs (removed operation log, simplified loading UI)
+
+**Build Status**: ✅ Successful compilation
+
+**Impact**: **Critical bugs resolved** - Asset extraction feature now fully functional with all translations saved correctly and proper file format compliance.
