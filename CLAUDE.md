@@ -4,6 +4,117 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Recent Updates
 
+### 2025-10-27: Asset Extraction Context Menu & Pattern Management
+**Improvement**: Added comprehensive right-click menu and exclude pattern management for extraction results.
+
+**Problem Identified**:
+- After scanning, users found many technical data (JSON, coordinates, etc.) but lacked easy filtering options
+- Users couldn't copy text from extraction results table
+- Auto-generated exclude patterns had no frontend management interface
+
+**Solutions Implemented**:
+- **Right-Click Menu** (AssetExtractionPage.xaml:444-481):
+  - 📋 **Copy Original Text** - One-click copy to clipboard
+  - 📄 **Copy Field Path** - Copy complete field path (e.g., "data.Array.dialogText")
+  - 📁 **Copy Source File** - Copy asset file full path
+  - ➕ **Add Field Name to Blacklist** - Auto-extract field name to ExcludeFieldNames
+  - 🚫 **Add to Exclude Pattern** - Smart regex generation to ExcludePatterns
+
+- **Exclude Pattern Management UI** (AssetExtractionPage.xaml:252-311):
+  - New ListView in "Advanced Filter Settings" to display all exclude patterns
+  - Add/Delete buttons with multi-select support
+  - Uses Consolas monospace font for regex readability
+  - Real-time count display: "共 N 个模式"
+  - InfoBar hint: users can quickly add patterns via right-click
+
+- **Smart Regex Generation** (AssetExtractionPage.xaml.cs:786-814):
+  - JSON object → `^\s*\{.*\}\s*$`
+  - JSON array → `^\s*\[.*\]\s*$`
+  - Numeric coordinates → `^[\d\.\-,\s]+$`
+  - Hex strings (≥8 chars) → `^[0-9a-fA-F]{8,}$`
+  - UUID/GUID → `^[0-9a-fA-F-]+$`
+  - Long text → `^<first 20 chars>.*$`
+
+- **Configuration Sync**:
+  - LoadConfigToUIAsync loads patterns to UI (AssetExtractionPage.xaml.cs:136-143)
+  - AutoSaveConfigAsync saves patterns to config (AssetExtractionPage.xaml.cs:197-202)
+  - Right-click menu adds directly to UI collection for instant feedback
+  - Auto-deduplication and empty pattern filtering
+
+- **Text Selection Removal**:
+  - Changed "Original Text" column from read-only TextBox back to TextBlock
+  - Unified user interaction: all copying via right-click menu only
+
+**User Workflow**:
+1. Scan completes → find technical data
+2. Right-click → "Add to Exclude Pattern"
+3. System auto-generates appropriate regex
+4. Expand "Advanced Filter Settings" → view/edit/delete in pattern list
+5. Next scan → data automatically filtered
+
+**Files Modified**:
+- `Views/AssetExtractionPage.xaml` - Added context menu, pattern management UI
+- `Views/AssetExtractionPage.xaml.cs` - Added event handlers, PatternEntry class
+- Pattern management fully integrated with existing auto-save system
+
+### 2025-10-27: MonoBehaviour All String Fields Smart Scanning
+**Feature**: Added intelligent scanning of all string fields in MonoBehaviour without field name restrictions.
+
+**Problem**: Users could miss game text if developers used custom field names not in the predefined list.
+
+**Solution**: Two-mode scanning system with smart filtering.
+
+**Implementation**:
+- **Data Model** (AssetExtractionConfig.cs:6-65):
+  - Added `MonoBehaviourScanMode` enum (SpecifiedFields / AllStringFields)
+  - Added `ScanMode` property (default: SpecifiedFields for backward compatibility)
+  - Added `MaxRecursionDepth` property (default: 3, range: 1-5)
+  - Added `ExcludeFieldNames` list with common technical field names (guid, id, path, url, shader, material, texture, etc.)
+
+- **Core Extraction Logic** (AssetTextExtractor.cs:793-933):
+  - `ExtractAllStringFieldsRecursive()`: Recursive traversal using `.Children` property
+    - Limits recursion depth to avoid performance issues
+    - Records full field path (e.g., "parent.child.text")
+    - Only extracts `TypeName == "string"` fields
+  - `IsLikelyGameText()`: Smart heuristic filtering with 8 rules:
+    1. Field name blacklist check (case-insensitive)
+    2. GUID format detection (standard and Unity GUID)
+    3. File path detection (Assets/, .prefab, .png, etc.)
+    4. URL/URI detection
+    5. Pure numeric detection
+    6. Variable name format (e.g., MAX_COUNT)
+    7. Hex color codes (#FFF, #FFFFFF)
+    8. Base64 encoding detection
+  - Modified `ExtractFromAssetsFileAsync()`: Branches based on ScanMode
+    - Records detailed statistics in AllStringFields mode
+
+- **UI Updates** (AssetExtractionPage.xaml:87-312):
+  - Added "MonoBehaviour Scan Mode" radio button group
+  - "Specified Fields" mode: Shows field name management Expander
+  - "All String Fields" mode: Shows advanced filter settings Expander
+    - Recursion depth slider (1-5 layers)
+    - Field name blacklist management (similar to field name list UI)
+  - Dynamic UI visibility based on selected mode
+
+- **Backend Logic** (AssetExtractionPage.xaml.cs):
+  - Added `_excludeFieldNames` ObservableCollection
+  - `ScanModeRadioButtons_SelectionChanged`: Toggles UI visibility
+  - `UpdateScanModeUI()`: Controls Expander visibility
+  - Advanced filter event handlers (add/delete/selection/text changed)
+  - Config loading and saving for all new properties
+
+**Results**:
+- Users can now extract text without knowing exact field names
+- Smart filtering reduces false positives (technical data extraction)
+- Detailed Debug logs show: total fields scanned, heuristic filters applied, final text count
+- Fully backward compatible - defaults to original SpecifiedFields mode
+
+**Testing**:
+- ✅ Compiled successfully with 0 warnings, 0 errors
+- ✅ Mode switching correctly shows/hides UI sections
+- ✅ Recursion depth slider updates properly
+- ✅ Config auto-saves and persists correctly
+
 ### 2025-10-27: Asset Extraction Major Fix
 **Problem**: Asset extraction was only finding 3 texts from 27 files, missing 35+ level files and all MonoBehaviour text.
 
@@ -214,11 +325,21 @@ AppData/XUnity-LLMTranslatePlus/
 - **IL2CPP**: Cpp2IlTempGenerator with global-metadata.dat + GameAssembly
 - **Auto-detection**: Mono → IL2CPP fallback
 
-**Configuration**:
-- `ScanTextAssets` / `ScanMonoBehaviours`
+**Configuration** (Updated 2025-10-27):
+- `ScanTextAssets` / `ScanMonoBehaviours` / `ScanGameObjectNames`
+- **`ScanMode`**: SpecifiedFields (default) / AllStringFields
+  - **SpecifiedFields**: Only scan configured field names in `MonoBehaviourFields`
+  - **AllStringFields**: Recursively scan all string fields with smart filtering
 - `MonoBehaviourFields`: **MUST include Unity standard fields with `m_` prefix** (e.g., `m_Text` for UI Text component)
+  - Only used in SpecifiedFields mode
+- **`MaxRecursionDepth`**: Recursion depth limit for AllStringFields mode (1-5, default: 3)
+- **`ExcludeFieldNames`**: Field name blacklist for AllStringFields mode (e.g., guid, id, path, url)
+  - Case-insensitive matching
+  - Applied before other filters
 - `SourceLanguageFilter`: All/CJK/Chinese/Japanese/English/Korean/Russian
-- `ExcludePatterns`: Regex to filter paths/variables
+- `ExcludePatterns`: Regex to filter text content (applies to all modes)
+  - Managed via frontend UI (add/edit/delete)
+  - Smart auto-generation via right-click menu
 - `ClassDatabasePath`: Optional custom classdata.tpk (embedded by default)
 
 **Critical Details**:
