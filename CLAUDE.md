@@ -480,6 +480,119 @@ private void TriggerAutoSave()
 
 ## Recent Updates
 
+### 2025-01-27: Configuration Change Response System
+
+**Major Bug Fix** - Resolved TextEditorPage not responding to game directory changes:
+
+**Problem**:
+- Users reported switching game directories didn't update the text editor
+- TextEditorPage continued displaying the previous game's translation file
+- Two root causes:
+  1. **No configuration change notification** - Pages unaware when config changed
+  2. **Manual path persistence** - `ManualTranslationFilePath` retained across games, taking priority over new `GameDirectory`
+
+**Solution Overview**:
+
+**1. Configuration Change Event System** (ConfigService.cs)
+- Added `ConfigChangedEventArgs` class with `ChangedProperties` HashSet
+- Added `ConfigChanged` event triggered on config save
+- Added `DetectConfigChanges()` method tracking key properties:
+  - `GameDirectory`, `ManualTranslationFilePath`
+  - `TargetLanguage`, `SourceLanguage`
+  - `SystemPrompt`, `EnableContext`, `ContextLines`
+
+Implementation:
+```csharp
+// ConfigService.cs - SaveConfigAsync
+var changedProperties = DetectConfigChanges(_currentConfig, config);
+// ... save config ...
+if (changedProperties.Count > 0)
+{
+    ConfigChanged?.Invoke(this, new ConfigChangedEventArgs(changedProperties));
+}
+```
+
+**2. TextEditorPage Event Subscription** (TextEditorPage.xaml.cs)
+- Subscribed to `ConfigService.ConfigChanged` in constructor
+- Added `OnConfigChanged()` handler:
+  - Monitors `GameDirectory` and `ManualTranslationFilePath` changes
+  - Clears current data and reloads file automatically
+  - Uses `DispatcherQueue` for thread-safe UI updates
+- Unsubscribes in `Unloaded` event (prevents memory leaks)
+
+Implementation:
+```csharp
+private void OnConfigChanged(object? sender, ConfigChangedEventArgs e)
+{
+    if (e.ChangedProperties.Contains(nameof(AppConfig.GameDirectory)) ||
+        e.ChangedProperties.Contains(nameof(AppConfig.ManualTranslationFilePath)))
+    {
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            _logService?.Log("检测到翻译文件路径配置变更，正在重新加载文件...", LogLevel.Info);
+            FilteredEntries.Clear();
+            _textEditorService?.Clear();
+            await AutoLoadFileAsync();
+        });
+    }
+}
+```
+
+**3. Auto-Clear Manual Path on Game Switch** (TranslationSettingsPage.xaml.cs)
+- Modified `BrowseGameDirButton_Click` to clear `ManualFilePathTextBox` when selecting new game directory
+- Prevents old game's manual path from persisting
+- Forces new game to use automatic path detection
+
+Implementation:
+```csharp
+if (folder != null)
+{
+    GameDirectoryTextBox.Text = folder.Path;
+    // Clear manual path when switching games
+    ManualFilePathTextBox.Text = "";
+    // ... auto-detect and save ...
+}
+```
+
+**Workflow**:
+```
+User switches game directory
+    ↓
+TranslationSettingsPage clears ManualFilePathTextBox
+    ↓
+Config auto-saves (500ms debounce)
+    ↓
+ConfigService detects GameDirectory + ManualTranslationFilePath changes
+    ↓
+ConfigChanged event fired
+    ↓
+TextEditorPage.OnConfigChanged receives event
+    ↓
+Clears data and calls AutoLoadFileAsync()
+    ↓
+TextEditorService.LoadFromConfigAsync uses new game's auto-detected path
+    ↓
+UI updates with new game's translation file
+```
+
+**Files Modified**: 3 files
+- ConfigService.cs - Added event system (+58 lines)
+- TextEditorPage.xaml.cs - Subscribe to config changes (+30 lines)
+- TranslationSettingsPage.xaml.cs - Auto-clear manual path (+4 lines)
+
+**Build Status**: ✅ Successful compilation
+
+**Impact**: **Critical UX improvement** - Text editor now automatically responds to game directory changes. Switching games properly updates all file references and data displays.
+
+**Technical Benefits**:
+- ✅ Event-driven architecture decouples config management from UI
+- ✅ Thread-safe with `DispatcherQueue` for cross-thread UI updates
+- ✅ Memory leak prevention with proper event unsubscription
+- ✅ Extensible - other pages can subscribe to `ConfigChanged` for reactive updates
+- ✅ User-friendly - switching games feels seamless and intuitive
+
+---
+
 ### 2025-01-27: Asset Extraction Page Improvements
 
 **Major Refactoring** - 10 improvements to enhance stability, usability, and consistency:

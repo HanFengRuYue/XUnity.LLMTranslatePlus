@@ -123,6 +123,10 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 GameDirectoryTextBox.Text = folder.Path;
 
+                // 清空手动指定的翻译文件路径（切换游戏目录时）
+                // 手动路径通常是针对特定游戏的，切换游戏后应该使用新游戏的自动检测
+                ManualFilePathTextBox.Text = "";
+
                 if (AutoDetectPathToggle.IsOn)
                 {
                     DetectTranslationPath(folder.Path);
@@ -130,6 +134,8 @@ namespace XUnity_LLMTranslatePlus.Views
 
                 // 自动保存
                 TriggerAutoSave();
+
+                _logService?.Log($"已切换游戏目录并清空手动路径: {folder.Path}", LogLevel.Info);
             }
         }
 

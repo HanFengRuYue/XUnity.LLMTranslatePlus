@@ -51,7 +51,7 @@ namespace XUnity_LLMTranslatePlus.Views
         public TextEditorPage()
         {
             this.InitializeComponent();
-            
+
             _textEditorService = App.GetService<TextEditorService>();
             _configService = App.GetService<ConfigService>();
             _logService = App.GetService<LogService>();
@@ -68,6 +68,12 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 _fileMonitorService.EntryTranslated += OnEntryTranslatedInMonitor;
                 _fileMonitorService.StatusChanged += OnMonitorStatusChanged;
+            }
+
+            // 订阅配置变更事件
+            if (_configService != null)
+            {
+                _configService.ConfigChanged += OnConfigChanged;
             }
 
             // 页面加载时自动加载文件
@@ -91,6 +97,12 @@ namespace XUnity_LLMTranslatePlus.Views
         {
             // 停止定时器
             _reloadDebounceTimer?.Stop();
+
+            // 取消订阅配置变更事件
+            if (_configService != null)
+            {
+                _configService.ConfigChanged -= OnConfigChanged;
+            }
         }
 
         private void OnMonitorStatusChanged(object? sender, FileMonitorEventArgs e)
@@ -159,6 +171,26 @@ namespace XUnity_LLMTranslatePlus.Views
                     _reloadDebounceTimer.Start();
                 }
             });
+        }
+
+        private void OnConfigChanged(object? sender, ConfigChangedEventArgs e)
+        {
+            // 检查是否为翻译文件路径相关的配置变更
+            if (e.ChangedProperties.Contains(nameof(AppConfig.GameDirectory)) ||
+                e.ChangedProperties.Contains(nameof(AppConfig.ManualTranslationFilePath)))
+            {
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    _logService?.Log("检测到翻译文件路径配置变更，正在重新加载文件...", LogLevel.Info);
+
+                    // 清空当前数据
+                    FilteredEntries.Clear();
+                    _textEditorService?.Clear();
+
+                    // 重新加载文件（使用防抖避免频繁重新加载）
+                    await AutoLoadFileAsync();
+                });
+            }
         }
 
         private void OnFileLoaded(object? sender, string filePath)

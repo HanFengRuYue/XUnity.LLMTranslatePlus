@@ -12,6 +12,22 @@ using XUnity_LLMTranslatePlus.Utils;
 namespace XUnity_LLMTranslatePlus.Services
 {
     /// <summary>
+    /// 配置变更事件参数
+    /// </summary>
+    public class ConfigChangedEventArgs : EventArgs
+    {
+        /// <summary>
+        /// 变更的属性名称列表
+        /// </summary>
+        public HashSet<string> ChangedProperties { get; }
+
+        public ConfigChangedEventArgs(HashSet<string> changedProperties)
+        {
+            ChangedProperties = changedProperties;
+        }
+    }
+
+    /// <summary>
     /// 配置管理服务
     /// </summary>
     public class ConfigService : IDisposable
@@ -25,6 +41,11 @@ namespace XUnity_LLMTranslatePlus.Services
 
         private AppConfig? _currentConfig;
         private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+
+        /// <summary>
+        /// 配置变更事件
+        /// </summary>
+        public event EventHandler<ConfigChangedEventArgs>? ConfigChanged;
 
         public ConfigService()
         {
@@ -234,6 +255,9 @@ namespace XUnity_LLMTranslatePlus.Services
             await _semaphore.WaitAsync(cancellationToken);
             try
             {
+                // 检测配置变更
+                var changedProperties = DetectConfigChanges(_currentConfig, config);
+
                 // 创建配置副本用于保存（不修改原始对象）
                 var configToSave = CopyConfigForSave(config);
 
@@ -268,6 +292,12 @@ namespace XUnity_LLMTranslatePlus.Services
                 string json = JsonSerializer.Serialize(configToSave, options);
                 await File.WriteAllTextAsync(ConfigFilePath, json);
                 _currentConfig = config; // 保存未加密的版本到内存
+
+                // 触发配置变更事件
+                if (changedProperties.Count > 0)
+                {
+                    ConfigChanged?.Invoke(this, new ConfigChangedEventArgs(changedProperties));
+                }
             }
             catch (Exception ex)
             {
@@ -305,6 +335,43 @@ namespace XUnity_LLMTranslatePlus.Services
         /// 获取配置文件路径
         /// </summary>
         public string GetConfigFilePath() => ConfigFilePath;
+
+        /// <summary>
+        /// 检测配置变更
+        /// </summary>
+        private HashSet<string> DetectConfigChanges(AppConfig? oldConfig, AppConfig newConfig)
+        {
+            var changedProperties = new HashSet<string>();
+
+            if (oldConfig == null)
+            {
+                return changedProperties;
+            }
+
+            // 检测关键属性的变更
+            if (oldConfig.GameDirectory != newConfig.GameDirectory)
+                changedProperties.Add(nameof(AppConfig.GameDirectory));
+
+            if (oldConfig.ManualTranslationFilePath != newConfig.ManualTranslationFilePath)
+                changedProperties.Add(nameof(AppConfig.ManualTranslationFilePath));
+
+            if (oldConfig.TargetLanguage != newConfig.TargetLanguage)
+                changedProperties.Add(nameof(AppConfig.TargetLanguage));
+
+            if (oldConfig.SourceLanguage != newConfig.SourceLanguage)
+                changedProperties.Add(nameof(AppConfig.SourceLanguage));
+
+            if (oldConfig.SystemPrompt != newConfig.SystemPrompt)
+                changedProperties.Add(nameof(AppConfig.SystemPrompt));
+
+            if (oldConfig.EnableContext != newConfig.EnableContext)
+                changedProperties.Add(nameof(AppConfig.EnableContext));
+
+            if (oldConfig.ContextLines != newConfig.ContextLines)
+                changedProperties.Add(nameof(AppConfig.ContextLines));
+
+            return changedProperties;
+        }
 
         /// <summary>
         /// 释放资源
