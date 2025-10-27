@@ -406,6 +406,8 @@ namespace XUnity_LLMTranslatePlus.Services
                     var monoBehaviours = assetsFile.file.GetAssetsOfType(AssetClassID.MonoBehaviour);
                     int monoBehaviourCount = 0;
                     int textFieldsFound = 0;
+                    int totalStringFieldsScanned = 0; // 仅在 AllStringFields 模式下使用
+                    int filteredByHeuristics = 0;     // 仅在 AllStringFields 模式下使用
 
                     foreach (var assetInfo in monoBehaviours)
                     {
@@ -418,16 +420,54 @@ namespace XUnity_LLMTranslatePlus.Services
 
                         try
                         {
-                            // 遍历配置的字段名
-                            foreach (var fieldName in _config.MonoBehaviourFields)
+                            // 根据扫描模式选择不同的提取逻辑
+                            if (_config.ScanMode == MonoBehaviourScanMode.SpecifiedFields)
                             {
-                                // 尝试多种字段名变体
-                                var field = TryGetFieldWithVariants(baseField, fieldName);
-
-                                if (field != null && !field.IsDummy && field.TypeName == "string")
+                                // 模式 1：仅扫描指定字段名（原有逻辑）
+                                foreach (var fieldName in _config.MonoBehaviourFields)
                                 {
-                                    var text = field.AsString;
-                                    if (!string.IsNullOrWhiteSpace(text) && IsValidText(text))
+                                    // 尝试多种字段名变体
+                                    var field = TryGetFieldWithVariants(baseField, fieldName);
+
+                                    if (field != null && !field.IsDummy && field.TypeName == "string")
+                                    {
+                                        var text = field.AsString;
+                                        if (!string.IsNullOrWhiteSpace(text) && IsValidText(text))
+                                        {
+                                            extractedTexts.Add(new ExtractedTextEntry
+                                            {
+                                                Text = text,
+                                                SourceAsset = sourceAsset,
+                                                RelativeSourcePath = GetRelativePath(sourceAsset),
+                                                AssetType = "MonoBehaviour",
+                                                FieldName = fieldName
+                                            });
+                                            textFieldsFound++;
+
+                                            await _logService.LogAsync(
+                                                $"找到文本字段 '{fieldName}' (PathId: {assetInfo.PathId}): {text.Substring(0, Math.Min(50, text.Length))}...",
+                                                LogLevel.Debug);
+                                        }
+                                    }
+                                }
+                            }
+                            else if (_config.ScanMode == MonoBehaviourScanMode.AllStringFields)
+                            {
+                                // 模式 2：扫描所有字符串字段（新逻辑）
+                                var allStringFields = ExtractAllStringFieldsRecursive(baseField, 0, "");
+                                totalStringFieldsScanned += allStringFields.Count;
+
+                                foreach (var (text, fieldPath) in allStringFields)
+                                {
+                                    // 应用智能启发式过滤
+                                    if (!IsLikelyGameText(text, fieldPath))
+                                    {
+                                        filteredByHeuristics++;
+                                        continue;
+                                    }
+
+                                    // 应用原有的验证规则（长度、语言、正则排除）
+                                    if (IsValidText(text))
                                     {
                                         extractedTexts.Add(new ExtractedTextEntry
                                         {
@@ -435,12 +475,12 @@ namespace XUnity_LLMTranslatePlus.Services
                                             SourceAsset = sourceAsset,
                                             RelativeSourcePath = GetRelativePath(sourceAsset),
                                             AssetType = "MonoBehaviour",
-                                            FieldName = fieldName
+                                            FieldName = fieldPath // 使用完整字段路径
                                         });
                                         textFieldsFound++;
 
                                         await _logService.LogAsync(
-                                            $"找到文本字段 '{fieldName}' (PathId: {assetInfo.PathId}): {text.Substring(0, Math.Min(50, text.Length))}...",
+                                            $"找到文本字段 '{fieldPath}' (PathId: {assetInfo.PathId}): {text.Substring(0, Math.Min(50, text.Length))}...",
                                             LogLevel.Debug);
                                     }
                                 }
@@ -455,11 +495,22 @@ namespace XUnity_LLMTranslatePlus.Services
                         }
                     }
 
+                    // 记录统计信息
                     if (monoBehaviourCount > 0)
                     {
-                        await _logService.LogAsync(
-                            $"资产文件 {Path.GetFileName(sourceAsset)}: 扫描 {monoBehaviourCount} 个 MonoBehaviour，找到 {textFieldsFound} 个文本字段",
-                            LogLevel.Debug);
+                        if (_config.ScanMode == MonoBehaviourScanMode.SpecifiedFields)
+                        {
+                            await _logService.LogAsync(
+                                $"资产文件 {Path.GetFileName(sourceAsset)}: 扫描 {monoBehaviourCount} 个 MonoBehaviour，找到 {textFieldsFound} 个文本字段",
+                                LogLevel.Debug);
+                        }
+                        else
+                        {
+                            await _logService.LogAsync(
+                                $"资产文件 {Path.GetFileName(sourceAsset)}: 扫描 {monoBehaviourCount} 个 MonoBehaviour，" +
+                                $"发现 {totalStringFieldsScanned} 个字符串字段，启发式过滤 {filteredByHeuristics} 个，提取 {textFieldsFound} 个文本",
+                                LogLevel.Debug);
+                        }
                     }
                 }
 
@@ -788,6 +839,148 @@ namespace XUnity_LLMTranslatePlus.Services
 
             // 未找到匹配的字段
             return null;
+        }
+
+        /// <summary>
+        /// 递归提取所有字符串字段（AllStringFields 模式）
+        /// </summary>
+        /// <param name="baseField">要扫描的基础字段</param>
+        /// <param name="currentDepth">当前递归深度</param>
+        /// <param name="parentPath">父字段路径（用于记录字段完整路径）</param>
+        /// <returns>提取的文本及其字段路径列表</returns>
+        private List<(string text, string fieldPath)> ExtractAllStringFieldsRecursive(
+            AssetTypeValueField baseField,
+            int currentDepth,
+            string parentPath)
+        {
+            var results = new List<(string, string)>();
+
+            // 检查递归深度限制
+            if (currentDepth > _config.MaxRecursionDepth)
+                return results;
+
+            try
+            {
+                // 获取所有子字段
+                var children = baseField.Children;
+                if (children == null || children.Count == 0)
+                    return results;
+
+                foreach (var child in children)
+                {
+                    if (child == null || child.IsDummy)
+                        continue;
+
+                    // 构建字段路径
+                    string fieldName = child.FieldName ?? "";
+                    string currentPath = string.IsNullOrEmpty(parentPath)
+                        ? fieldName
+                        : $"{parentPath}.{fieldName}";
+
+                    // 如果是字符串类型，提取文本
+                    if (child.TypeName == "string")
+                    {
+                        try
+                        {
+                            var text = child.AsString;
+                            if (!string.IsNullOrWhiteSpace(text))
+                            {
+                                results.Add((text, currentPath));
+                            }
+                        }
+                        catch
+                        {
+                            // 某些字段可能无法转换为字符串，跳过
+                        }
+                    }
+                    // 如果是复杂类型，递归扫描
+                    else if (child.Children != null && child.Children.Count > 0)
+                    {
+                        var nestedResults = ExtractAllStringFieldsRecursive(
+                            child,
+                            currentDepth + 1,
+                            currentPath);
+                        results.AddRange(nestedResults);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.Log(
+                    $"递归提取字段时出错 (路径: {parentPath}, 深度: {currentDepth}): {ex.Message}",
+                    LogLevel.Debug);
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// 判断字符串是否像游戏文本（智能启发式过滤）
+        /// </summary>
+        /// <param name="text">要检查的文本</param>
+        /// <param name="fieldPath">字段路径（如 "parent.child.text"）</param>
+        /// <returns>true 表示可能是游戏文本，false 表示可能是技术数据</returns>
+        private bool IsLikelyGameText(string text, string fieldPath)
+        {
+            // 提取字段名（路径的最后一部分）
+            string fieldName = fieldPath.Contains('.')
+                ? fieldPath.Substring(fieldPath.LastIndexOf('.') + 1)
+                : fieldPath;
+
+            // 1. 检查字段名黑名单（不区分大小写）
+            if (_config.ExcludeFieldNames.Any(excluded =>
+                fieldName.Equals(excluded, StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+
+            // 2. GUID 格式检测
+            // 标准 GUID: 8-4-4-4-12 格式（如 "550e8400-e29b-41d4-a716-446655440000"）
+            if (Regex.IsMatch(text, @"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"))
+                return false;
+
+            // Unity GUID (32位十六进制，无连字符)
+            if (Regex.IsMatch(text, @"^[0-9a-fA-F]{32}$"))
+                return false;
+
+            // 3. 文件路径检测
+            if (text.Contains("Assets/") || text.Contains("Resources/") ||
+                text.Contains("Prefabs/") || text.Contains("Scenes/") ||
+                text.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase) ||
+                text.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ||
+                text.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                text.EndsWith(".mat", StringComparison.OrdinalIgnoreCase) ||
+                text.EndsWith(".shader", StringComparison.OrdinalIgnoreCase) ||
+                text.EndsWith(".unity", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            // 4. URL/URI 检测
+            if (text.Contains("://") || text.StartsWith("http") ||
+                text.StartsWith("www.") || text.StartsWith("ftp://"))
+            {
+                return false;
+            }
+
+            // 5. 纯数字检测（整数或浮点数）
+            if (Regex.IsMatch(text, @"^-?\d+$") || Regex.IsMatch(text, @"^-?\d+\.\d+$"))
+                return false;
+
+            // 6. 变量名格式检测（纯大写字母+下划线，如 "MAX_COUNT"）
+            if (Regex.IsMatch(text, @"^[A-Z_][A-Z0-9_]*$") && text.Length > 1 && text.Contains("_"))
+                return false;
+
+            // 7. 十六进制颜色代码（如 "#FFFFFF" 或 "#FFF"）
+            if (Regex.IsMatch(text, @"^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$"))
+                return false;
+
+            // 8. Base64 编码检测（长度超过 20 且只包含 Base64 字符）
+            if (text.Length > 20 && Regex.IsMatch(text, @"^[A-Za-z0-9+/=]+$"))
+                return false;
+
+            // 通过所有过滤规则，可能是游戏文本
+            return true;
         }
 
         /// <summary>

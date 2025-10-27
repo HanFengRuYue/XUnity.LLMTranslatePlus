@@ -28,6 +28,8 @@ namespace XUnity_LLMTranslatePlus.Views
         private List<ExtractedTextEntry> _extractedTexts = new List<ExtractedTextEntry>();
         private List<ExtractedTextEntry> _filteredTexts = new List<ExtractedTextEntry>();
         private ObservableCollection<FieldNameEntry> _fieldNames = new ObservableCollection<FieldNameEntry>();
+        private ObservableCollection<FieldNameEntry> _excludeFieldNames = new ObservableCollection<FieldNameEntry>();
+        private ObservableCollection<PatternEntry> _excludePatterns = new ObservableCollection<PatternEntry>();
         private CancellationTokenSource? _cancellationTokenSource;
 
         // 自动保存定时器
@@ -99,6 +101,20 @@ namespace XUnity_LLMTranslatePlus.Views
                 };
                 SourceLanguageComboBox.SelectedIndex = languageIndex;
 
+                // 加载扫描模式
+                if (config.AssetExtraction.ScanMode == MonoBehaviourScanMode.SpecifiedFields)
+                {
+                    SpecifiedFieldsRadioButton.IsChecked = true;
+                }
+                else
+                {
+                    AllStringFieldsRadioButton.IsChecked = true;
+                }
+
+                // 加载递归深度
+                RecursionDepthSlider.Value = config.AssetExtraction.MaxRecursionDepth;
+                RecursionDepthText.Text = config.AssetExtraction.MaxRecursionDepth.ToString();
+
                 // 加载字段名列表
                 _fieldNames.Clear();
                 foreach (var field in config.AssetExtraction.MonoBehaviourFields)
@@ -107,6 +123,27 @@ namespace XUnity_LLMTranslatePlus.Views
                 }
                 FieldNamesListView.ItemsSource = _fieldNames;
                 UpdateFieldCountText();
+
+                // 加载排除字段名列表
+                _excludeFieldNames.Clear();
+                foreach (var field in config.AssetExtraction.ExcludeFieldNames)
+                {
+                    _excludeFieldNames.Add(new FieldNameEntry { FieldName = field });
+                }
+                ExcludeFieldNamesListView.ItemsSource = _excludeFieldNames;
+                UpdateExcludeFieldCountText();
+
+                // 加载排除模式列表
+                _excludePatterns.Clear();
+                foreach (var pattern in config.AssetExtraction.ExcludePatterns)
+                {
+                    _excludePatterns.Add(new PatternEntry { Pattern = pattern });
+                }
+                ExcludePatternsListView.ItemsSource = _excludePatterns;
+                UpdateExcludePatternCountText();
+
+                // 根据扫描模式更新 UI 显示
+                UpdateScanModeUI();
             }
             finally
             {
@@ -135,10 +172,32 @@ namespace XUnity_LLMTranslatePlus.Views
                 config.AssetExtraction.ClassDatabasePath = ClassDatabasePathTextBox.Text;
                 config.AssetExtraction.SourceLanguageFilter = ((ComboBoxItem)SourceLanguageComboBox.SelectedItem)?.Content?.ToString() ?? "全部语言";
 
+                // 更新扫描模式
+                config.AssetExtraction.ScanMode = SpecifiedFieldsRadioButton.IsChecked == true
+                    ? MonoBehaviourScanMode.SpecifiedFields
+                    : MonoBehaviourScanMode.AllStringFields;
+
+                // 更新递归深度
+                config.AssetExtraction.MaxRecursionDepth = (int)RecursionDepthSlider.Value;
+
                 // 更新字段名列表
                 config.AssetExtraction.MonoBehaviourFields = _fieldNames
                     .Where(f => !string.IsNullOrWhiteSpace(f.FieldName))
                     .Select(f => f.FieldName)
+                    .Distinct()
+                    .ToList();
+
+                // 更新排除字段名列表
+                config.AssetExtraction.ExcludeFieldNames = _excludeFieldNames
+                    .Where(f => !string.IsNullOrWhiteSpace(f.FieldName))
+                    .Select(f => f.FieldName)
+                    .Distinct()
+                    .ToList();
+
+                // 更新排除模式列表
+                config.AssetExtraction.ExcludePatterns = _excludePatterns
+                    .Where(p => !string.IsNullOrWhiteSpace(p.Pattern))
+                    .Select(p => p.Pattern)
                     .Distinct()
                     .ToList();
 
@@ -192,6 +251,116 @@ namespace XUnity_LLMTranslatePlus.Views
         {
             var count = _fieldNames.Count;
             FieldCountText.Text = count > 0 ? $"共 {count} 个字段" : "";
+        }
+
+        // ==================== 扫描模式切换 ====================
+
+        private void ScanModeRadioButtons_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isLoadingConfig) return;
+
+            UpdateScanModeUI();
+            TriggerAutoSave();
+        }
+
+        private void UpdateScanModeUI()
+        {
+            bool isSpecifiedFields = SpecifiedFieldsRadioButton?.IsChecked == true;
+
+            // 根据扫描模式显示/隐藏对应的 UI
+            if (FieldNamesExpander != null)
+            {
+                FieldNamesExpander.Visibility = isSpecifiedFields ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (AdvancedFilterExpander != null)
+            {
+                AdvancedFilterExpander.Visibility = isSpecifiedFields ? Visibility.Collapsed : Visibility.Visible;
+            }
+        }
+
+        // ==================== 高级过滤设置 ====================
+
+        private void RecursionDepthSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (_isLoadingConfig) return;
+
+            int depth = (int)e.NewValue;
+            if (RecursionDepthText != null)
+            {
+                RecursionDepthText.Text = depth.ToString();
+            }
+            TriggerAutoSave();
+        }
+
+        private void AddExcludeFieldButton_Click(object sender, RoutedEventArgs e)
+        {
+            _excludeFieldNames.Add(new FieldNameEntry { FieldName = "" });
+            UpdateExcludeFieldCountText();
+            TriggerAutoSave();
+        }
+
+        private void DeleteExcludeFieldButton_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItems = ExcludeFieldNamesListView.SelectedItems.Cast<FieldNameEntry>().ToList();
+            foreach (var item in selectedItems)
+            {
+                _excludeFieldNames.Remove(item);
+            }
+            UpdateExcludeFieldCountText();
+            TriggerAutoSave();
+        }
+
+        private void ExcludeFieldNamesListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            DeleteExcludeFieldButton.IsEnabled = ExcludeFieldNamesListView.SelectedItems.Count > 0;
+        }
+
+        private void ExcludeFieldNameTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            TriggerAutoSave();
+        }
+
+        private void UpdateExcludeFieldCountText()
+        {
+            var count = _excludeFieldNames.Count;
+            ExcludeFieldCountText.Text = count > 0 ? $"共 {count} 个字段" : "";
+        }
+
+        // ==================== 排除模式管理 ====================
+
+        private void AddExcludePatternButton_Click(object sender, RoutedEventArgs e)
+        {
+            _excludePatterns.Add(new PatternEntry { Pattern = "" });
+            UpdateExcludePatternCountText();
+            TriggerAutoSave();
+        }
+
+        private void DeleteExcludePatternButton_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedItems = ExcludePatternsListView.SelectedItems.Cast<PatternEntry>().ToList();
+            foreach (var item in selectedItems)
+            {
+                _excludePatterns.Remove(item);
+            }
+            UpdateExcludePatternCountText();
+            TriggerAutoSave();
+        }
+
+        private void ExcludePatternsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            DeleteExcludePatternButton.IsEnabled = ExcludePatternsListView.SelectedItems.Count > 0;
+        }
+
+        private void ExcludePatternTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            TriggerAutoSave();
+        }
+
+        private void UpdateExcludePatternCountText()
+        {
+            var count = _excludePatterns.Count;
+            ExcludePatternCountText.Text = count > 0 ? $"共 {count} 个模式" : "";
         }
 
         // ==================== 扫描和翻译 ====================
@@ -512,6 +681,162 @@ namespace XUnity_LLMTranslatePlus.Views
         {
             UpdateExtractedTextsStats();
         }
+
+        // ==================== 右键菜单功能 ====================
+
+        private void CopyTextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuFlyoutItem menuItem && menuItem.DataContext is ExtractedTextEntry entry)
+            {
+                CopyToClipboard(entry.Text);
+            }
+        }
+
+        private void CopyFieldPathMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuFlyoutItem menuItem && menuItem.DataContext is ExtractedTextEntry entry)
+            {
+                CopyToClipboard(entry.FieldName);
+            }
+        }
+
+        private void CopySourcePathMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuFlyoutItem menuItem && menuItem.DataContext is ExtractedTextEntry entry)
+            {
+                CopyToClipboard(entry.SourceAsset);
+            }
+        }
+
+        private async void AddFieldToBlacklistMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuFlyoutItem menuItem && menuItem.DataContext is ExtractedTextEntry entry)
+            {
+                if (string.IsNullOrWhiteSpace(entry.FieldName))
+                {
+                    await ShowNotificationAsync("字段名为空，无法添加到黑名单", false);
+                    return;
+                }
+
+                // 提取字段名（去除路径，只保留最后一级）
+                string fieldName = entry.FieldName.Contains('.')
+                    ? entry.FieldName.Substring(entry.FieldName.LastIndexOf('.') + 1)
+                    : entry.FieldName;
+
+                // 检查是否已存在
+                if (_excludeFieldNames.Any(f => f.FieldName.Equals(fieldName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    await ShowNotificationAsync($"字段名 '{fieldName}' 已在黑名单中", false);
+                    return;
+                }
+
+                // 添加到黑名单
+                _excludeFieldNames.Add(new FieldNameEntry { FieldName = fieldName });
+                UpdateExcludeFieldCountText();
+                TriggerAutoSave();
+
+                await ShowNotificationAsync($"已添加 '{fieldName}' 到字段名黑名单，下次扫描生效", true);
+            }
+        }
+
+        private async void AddToExcludePatternMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuFlyoutItem menuItem && menuItem.DataContext is ExtractedTextEntry entry)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Text))
+                {
+                    await ShowNotificationAsync("文本为空，无法生成排除模式", false);
+                    return;
+                }
+
+                // 生成智能正则表达式
+                string pattern = GenerateExcludePattern(entry.Text);
+
+                // 检查是否已存在
+                if (_excludePatterns.Any(p => p.Pattern == pattern))
+                {
+                    await ShowNotificationAsync("该排除模式已存在", false);
+                    return;
+                }
+
+                // 添加到 UI 列表
+                _excludePatterns.Add(new PatternEntry { Pattern = pattern });
+                UpdateExcludePatternCountText();
+                TriggerAutoSave();
+
+                await ShowNotificationAsync($"已添加排除模式: {pattern}\n下次扫描生效", true);
+            }
+        }
+
+        /// <summary>
+        /// 复制文本到剪贴板
+        /// </summary>
+        private void CopyToClipboard(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            try
+            {
+                var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                dataPackage.SetText(text);
+                Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+            }
+            catch (Exception ex)
+            {
+                if (_logService != null)
+                {
+                    _ = _logService.LogAsync($"复制到剪贴板失败: {ex.Message}", LogLevel.Warning);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 智能生成排除正则表达式
+        /// </summary>
+        private string GenerateExcludePattern(string text)
+        {
+            var trimmed = text.Trim();
+
+            // JSON 对象
+            if (trimmed.StartsWith("{") && trimmed.EndsWith("}"))
+                return @"^\s*\{.*\}\s*$";
+
+            // JSON 数组
+            if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+                return @"^\s*\[.*\]\s*$";
+
+            // 数字坐标/数组（如 "0.5,1.2,3.4" 或 "100 200 300"）
+            if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^[\d\.\-,\s]+$"))
+                return @"^[\d\.\-,\s]+$";
+
+            // 纯十六进制（如 "a1b2c3d4"，至少8位）
+            if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^[0-9a-fA-F]+$") && trimmed.Length >= 8)
+                return @"^[0-9a-fA-F]{8,}$";
+
+            // 包含多个连续的 UUID/GUID 分隔符
+            if (trimmed.Count(c => c == '-') >= 4)
+                return @"^[0-9a-fA-F-]+$";
+
+            // 默认：转义特殊字符后的字面匹配（前10个字符）
+            // 对于很长的文本，只匹配开头部分
+            string sample = trimmed.Length > 20 ? trimmed.Substring(0, 20) : trimmed;
+            return "^" + System.Text.RegularExpressions.Regex.Escape(sample) + ".*$";
+        }
+
+        /// <summary>
+        /// 显示通知消息
+        /// </summary>
+        private async Task ShowNotificationAsync(string message, bool isSuccess)
+        {
+            if (_logService != null)
+            {
+                await _logService.LogAsync(message, isSuccess ? LogLevel.Info : LogLevel.Warning);
+            }
+
+            // 可选：使用 InfoBar 显示临时通知（需要在 XAML 中添加）
+            // 这里先通过日志系统通知
+        }
     }
 
     // ==================== 辅助类 ====================
@@ -532,6 +857,29 @@ namespace XUnity_LLMTranslatePlus.Views
                 {
                     _fieldName = value;
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FieldName)));
+                }
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+    }
+
+    /// <summary>
+    /// 排除模式条目
+    /// </summary>
+    public class PatternEntry : INotifyPropertyChanged
+    {
+        private string _pattern = "";
+
+        public string Pattern
+        {
+            get => _pattern;
+            set
+            {
+                if (_pattern != value)
+                {
+                    _pattern = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Pattern)));
                 }
             }
         }

@@ -4,6 +4,22 @@ using System.Collections.Generic;
 namespace XUnity_LLMTranslatePlus.Models
 {
     /// <summary>
+    /// MonoBehaviour 扫描模式
+    /// </summary>
+    public enum MonoBehaviourScanMode
+    {
+        /// <summary>
+        /// 仅扫描指定字段名（原有模式）
+        /// </summary>
+        SpecifiedFields,
+
+        /// <summary>
+        /// 扫描所有字符串字段（智能过滤）
+        /// </summary>
+        AllStringFields
+    }
+
+    /// <summary>
     /// 资产提取配置数据模型
     /// </summary>
     public class AssetExtractionConfig
@@ -24,8 +40,34 @@ namespace XUnity_LLMTranslatePlus.Models
         public bool ScanGameObjectNames { get; set; } = false;
 
         /// <summary>
+        /// MonoBehaviour 扫描模式（指定字段名 或 扫描所有字符串字段）
+        /// </summary>
+        public MonoBehaviourScanMode ScanMode { get; set; } = MonoBehaviourScanMode.SpecifiedFields;
+
+        /// <summary>
+        /// 递归扫描最大深度（仅在 AllStringFields 模式下生效）
+        /// 限制嵌套对象的扫描深度，避免过深递归导致性能问题
+        /// </summary>
+        public int MaxRecursionDepth { get; set; } = 3;
+
+        /// <summary>
+        /// 字段名黑名单（仅在 AllStringFields 模式下生效）
+        /// 匹配这些字段名的字符串将被过滤（不区分大小写）
+        /// </summary>
+        public List<string> ExcludeFieldNames { get; set; } = new List<string>
+        {
+            "guid", "id", "uuid",
+            "path", "resourcePath", "assetPath", "scenePath", "prefabPath",
+            "url", "uri", "link",
+            "shader", "material", "texture",
+            "className", "typeName", "scriptName",
+            "tag", "layer"
+        };
+
+        /// <summary>
         /// MonoBehaviour 字段名列表（指定要提取哪些字段的文本）
         /// 注意：Unity 组件字段通常有 m_ 前缀（如 m_Text），自定义脚本可能无前缀（如 text）
+        /// 仅在 SpecifiedFields 模式下生效
         /// </summary>
         public List<string> MonoBehaviourFields { get; set; } = new List<string>
         {
