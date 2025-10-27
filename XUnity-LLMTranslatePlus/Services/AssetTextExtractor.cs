@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AssetsTools.NET;
+using AssetsTools.NET.Cpp2IL;
 using AssetsTools.NET.Extra;
 using XUnity_LLMTranslatePlus.Models;
 
@@ -186,6 +187,7 @@ namespace XUnity_LLMTranslatePlus.Services
 
         /// <summary>
         /// 从单个资产文件中提取文本
+        /// 支持 Bundle 文件和普通资产文件
         /// </summary>
         private async Task<List<ExtractedTextEntry>> ExtractFromSingleAssetAsync(
             string assetFilePath,
@@ -198,16 +200,23 @@ namespace XUnity_LLMTranslatePlus.Services
 
             try
             {
-                // 尝试作为 Bundle 加载
+                // 尝试作为 Bundle 文件加载（自动解压缩）
                 BundleFileInstance? bundleInstance = null;
                 AssetsFileInstance? assetsFileInstance = null;
 
                 try
                 {
-                    bundleInstance = _assetsManager.LoadBundleFile(assetFilePath);
+                    // 使用 unpackIfPacked=true 自动解压缩 Bundle
+                    bundleInstance = _assetsManager.LoadBundleFile(assetFilePath, unpackIfPacked: true);
 
-                    // Bundle 文件，提取其中的资产文件
-                    for (int i = 0; i < bundleInstance.file.BlockAndDirInfo.DirectoryInfos.Count; i++)
+                    // 记录 Bundle 信息
+                    var dirCount = bundleInstance.file.BlockAndDirInfo.DirectoryInfos.Count;
+                    await _logService.LogAsync(
+                        $"成功加载 Bundle 文件: {Path.GetFileName(assetFilePath)} (包含 {dirCount} 个文件)",
+                        LogLevel.Info);
+
+                    // 遍历 Bundle 内的文件
+                    for (int i = 0; i < dirCount; i++)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
 
@@ -215,13 +224,27 @@ namespace XUnity_LLMTranslatePlus.Services
                         {
                             var dirInfo = bundleInstance.file.BlockAndDirInfo.DirectoryInfos[i];
 
-                            // 跳过非 assets 文件（如 .resS, .resource 等资源文件）
+                            // 跳过非 .assets 资源文件（如 .resS, .resource 等）
                             if (!dirInfo.Name.EndsWith(".assets", StringComparison.OrdinalIgnoreCase))
+                            {
+                                await _logService.LogAsync(
+                                    $"跳过 Bundle 内资源文件: {dirInfo.Name}",
+                                    LogLevel.Debug);
                                 continue;
+                            }
+
+                            // 加载并提取资产文件
+                            await _logService.LogAsync(
+                                $"提取 Bundle 内资产文件: {dirInfo.Name}",
+                                LogLevel.Debug);
 
                             assetsFileInstance = _assetsManager.LoadAssetsFileFromBundle(bundleInstance, i);
                             var texts = await ExtractFromAssetsFileAsync(assetsFileInstance, assetFilePath);
                             extractedTexts.AddRange(texts);
+
+                            await _logService.LogAsync(
+                                $"从 {dirInfo.Name} 提取 {texts.Count} 条文本",
+                                LogLevel.Debug);
                         }
                         catch (Exception ex)
                         {
@@ -230,19 +253,40 @@ namespace XUnity_LLMTranslatePlus.Services
                                 LogLevel.Warning);
                         }
                     }
+
+                    await _logService.LogAsync(
+                        $"Bundle 文件提取完成: {Path.GetFileName(assetFilePath)}, 共提取 {extractedTexts.Count} 条文本",
+                        LogLevel.Info);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // 不是 Bundle 文件，尝试作为普通资产文件加载
-                    assetsFileInstance = _assetsManager.LoadAssetsFile(assetFilePath);
+                    // 不是 Bundle 文件或加载失败，尝试作为普通资产文件
+                    await _logService.LogAsync(
+                        $"作为 Bundle 加载失败，尝试作为普通资产文件: {ex.Message}",
+                        LogLevel.Debug);
+
+                    // 加载普通资产文件（使用 FileShare.ReadWrite 允许 XUnity 并发访问）
+                    await using var fileStream = new FileStream(
+                        assetFilePath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.ReadWrite,
+                        4096,
+                        FileOptions.Asynchronous);
+
+                    assetsFileInstance = _assetsManager.LoadAssetsFile(fileStream, assetFilePath, true);
                     var texts = await ExtractFromAssetsFileAsync(assetsFileInstance, assetFilePath);
                     extractedTexts.AddRange(texts);
+
+                    await _logService.LogAsync(
+                        $"从普通资产文件提取 {texts.Count} 条文本: {Path.GetFileName(assetFilePath)}",
+                        LogLevel.Info);
                 }
             }
             catch (Exception ex)
             {
                 await _logService.LogAsync(
-                    $"加载资产文件失败: {ex.Message}",
+                    $"加载资产文件失败: {Path.GetFileName(assetFilePath)} - {ex.Message}",
                     LogLevel.Warning);
             }
 
@@ -603,6 +647,7 @@ namespace XUnity_LLMTranslatePlus.Services
         /// <summary>
         /// 设置 MonoTempGenerator 用于 MonoBehaviour 反序列化（参考 UABEANext）
         /// 当资产文件没有 TypeTree 时需要此生成器
+        /// 支持 Mono 和 IL2CPP 两种后端
         /// </summary>
         private async Task<bool> SetupMonoTempGeneratorAsync()
         {
@@ -626,7 +671,7 @@ namespace XUnity_LLMTranslatePlus.Services
                 // 2. 回退：游戏根目录/Managed（某些特殊打包方式）
                 searchPaths.Add(Path.Combine(_gameDirectory, "Managed"));
 
-                // 尝试每个路径
+                // 尝试每个路径检测 Mono 后端
                 foreach (var managedDir in searchPaths)
                 {
                     if (Directory.Exists(managedDir))
@@ -636,17 +681,46 @@ namespace XUnity_LLMTranslatePlus.Services
                         {
                             _assetsManager.MonoTempGenerator = new MonoCecilTempGenerator(managedDir);
                             await _logService.LogAsync(
-                                $"已设置 MonoCecilTempGenerator: {managedDir} ({dllFiles.Length} 个 DLL)",
+                                $"已设置 MonoCecilTempGenerator（Mono 后端）: {managedDir} ({dllFiles.Length} 个 DLL)",
                                 LogLevel.Info);
                             return true;
                         }
                     }
                 }
 
-                // 未找到 Managed 文件夹，记录尝试的路径
+                // 3. 回退：检测 IL2CPP 后端
+                // 从游戏根目录或 *_Data 目录查找 IL2CPP 文件
+                List<string> il2cppSearchPaths = new List<string>();
+
+                // 先尝试 *_Data 目录（标准位置）
+                foreach (var dataDir in dataDirs)
+                {
+                    il2cppSearchPaths.Add(dataDir);
+                }
+
+                // 再尝试游戏根目录
+                il2cppSearchPaths.Add(_gameDirectory);
+
+                foreach (var searchPath in il2cppSearchPaths)
+                {
+                    var il2cppFiles = FindCpp2IlFiles.Find(searchPath);
+                    if (il2cppFiles.success)
+                    {
+                        _assetsManager.MonoTempGenerator = new Cpp2IlTempGenerator(
+                            il2cppFiles.metaPath!,
+                            il2cppFiles.asmPath!
+                        );
+                        await _logService.LogAsync(
+                            $"已设置 Cpp2IlTempGenerator（IL2CPP 后端）: {Path.GetFileName(il2cppFiles.metaPath)} + {Path.GetFileName(il2cppFiles.asmPath)}",
+                            LogLevel.Info);
+                        return true;
+                    }
+                }
+
+                // 未找到 Managed 文件夹或 IL2CPP 文件，记录尝试的路径
                 var attemptedPaths = string.Join(", ", searchPaths.Select(p => $"'{Path.GetFileName(Path.GetDirectoryName(p))}/Managed'"));
                 await _logService.LogAsync(
-                    $"未找到 Managed 文件夹（已尝试: {attemptedPaths}），MonoBehaviour 提取将依赖 ClassDatabase 和 TypeTree",
+                    $"未找到 Managed 文件夹或 IL2CPP 元数据（已尝试: {attemptedPaths}），MonoBehaviour 提取将依赖 ClassDatabase 和 TypeTree",
                     LogLevel.Warning);
                 return false;
             }
@@ -661,7 +735,8 @@ namespace XUnity_LLMTranslatePlus.Services
 
         /// <summary>
         /// 检查并设置 MonoTempGenerator（仅在需要时调用，参考 UABEANext）
-        /// 从资产文件所在目录查找 Managed 文件夹
+        /// 从资产文件所在目录查找 Managed 文件夹或 IL2CPP 元数据
+        /// 支持 Mono 和 IL2CPP 两种后端
         /// </summary>
         private async Task CheckAndSetMonoTempGeneratorsAsync(AssetsFileInstance fileInst)
         {
@@ -697,7 +772,7 @@ namespace XUnity_LLMTranslatePlus.Services
                     return;
                 }
 
-                // 在资产文件所在目录查找 Managed
+                // 方法 1：在资产文件所在目录查找 Mono Managed 文件夹
                 var managedDir = Path.Combine(assetDir, "Managed");
                 if (Directory.Exists(managedDir))
                 {
@@ -706,10 +781,24 @@ namespace XUnity_LLMTranslatePlus.Services
                     {
                         _assetsManager.MonoTempGenerator = new MonoCecilTempGenerator(managedDir);
                         await _logService.LogAsync(
-                            $"已设置 MonoCecilTempGenerator: {managedDir} ({dllFiles.Length} 个 DLL)",
+                            $"已设置 MonoCecilTempGenerator（Mono 后端）: {managedDir} ({dllFiles.Length} 个 DLL)",
                             LogLevel.Info);
                         return;
                     }
+                }
+
+                // 方法 2：在资产文件所在目录查找 IL2CPP 文件
+                var il2cppFiles = FindCpp2IlFiles.Find(assetDir);
+                if (il2cppFiles.success)
+                {
+                    _assetsManager.MonoTempGenerator = new Cpp2IlTempGenerator(
+                        il2cppFiles.metaPath!,
+                        il2cppFiles.asmPath!
+                    );
+                    await _logService.LogAsync(
+                        $"已设置 Cpp2IlTempGenerator（IL2CPP 后端）: {Path.GetFileName(il2cppFiles.metaPath)} + {Path.GetFileName(il2cppFiles.asmPath)}",
+                        LogLevel.Info);
+                    return;
                 }
 
                 // 如果资产目录中找不到，回退到游戏根目录搜索
