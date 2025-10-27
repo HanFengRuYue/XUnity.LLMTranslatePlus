@@ -44,63 +44,84 @@ namespace XUnity_LLMTranslatePlus.Services
 
                 await _logService.LogAsync($"开始扫描游戏目录: {validatedGameDir}", LogLevel.Info);
 
-                var assetFiles = new List<string>();
-
-                // 确定要搜索的扩展名
-                var extensions = config.FileExtensions.Count > 0
-                    ? config.FileExtensions
-                    : new List<string> { ".assets", ".unity3d", ".bundle", ".resS", ".resource" };
+                var candidateFiles = new List<string>();
 
                 // 搜索选项
                 var searchOption = config.RecursiveScan
                     ? SearchOption.AllDirectories
                     : SearchOption.TopDirectoryOnly;
 
-                // 扫描每种扩展名
-                foreach (var extension in extensions)
+                // 明显的非资产文件扩展名（排除列表）
+                var excludedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    ".dll", ".exe", ".so", ".dylib",      // 二进制库/可执行文件
+                    ".txt", ".xml", ".json", ".csv",      // 文本配置文件
+                    ".pdb", ".mdb",                        // 调试符号
+                    ".log", ".ini", ".cfg", ".config",    // 日志和配置
+                    ".manifest", ".meta",                  // Unity 元数据
+                    ".md", ".pdf", ".doc", ".docx",       // 文档
+                    ".mp3", ".wav", ".ogg", ".m4a",       // 音频（通常不是资产文件）
+                    ".mp4", ".avi", ".mov", ".mkv",       // 视频
+                    ".jpg", ".jpeg", ".png", ".bmp", ".tga", ".gif" // 图像（通常不直接是资产文件）
+                };
 
-                    try
-                    {
-                        var files = Directory.GetFiles(validatedGameDir, $"*{extension}", searchOption);
-                        assetFiles.AddRange(files);
+                // 遍历所有文件
+                try
+                {
+                    var allFiles = Directory.GetFiles(validatedGameDir, "*", searchOption);
 
-                        await _logService.LogAsync(
-                            $"找到 {files.Length} 个 {extension} 文件",
-                            LogLevel.Debug);
-                    }
-                    catch (UnauthorizedAccessException ex)
+                    await _logService.LogAsync(
+                        $"找到 {allFiles.Length} 个文件，开始筛选...",
+                        LogLevel.Info);
+
+                    foreach (var file in allFiles)
                     {
-                        await _logService.LogAsync(
-                            $"访问目录被拒绝: {ex.Message}",
-                            LogLevel.Warning);
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        var extension = Path.GetExtension(file);
+
+                        // 跳过明显的非资产文件
+                        if (!string.IsNullOrEmpty(extension) && excludedExtensions.Contains(extension))
+                        {
+                            continue;
+                        }
+
+                        // 所有其他文件（包括无扩展名文件）都作为候选
+                        candidateFiles.Add(file);
                     }
-                    catch (Exception ex)
-                    {
-                        await _logService.LogAsync(
-                            $"扫描 {extension} 文件时出错: {ex.Message}",
-                            LogLevel.Error);
-                    }
+
+                    await _logService.LogAsync(
+                        $"筛选完成，共 {candidateFiles.Count} 个候选文件（已排除 {allFiles.Length - candidateFiles.Count} 个明显的非资产文件）",
+                        LogLevel.Info);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    await _logService.LogAsync(
+                        $"访问目录被拒绝: {ex.Message}",
+                        LogLevel.Warning);
+                }
+                catch (Exception ex)
+                {
+                    await _logService.LogAsync(
+                        $"扫描文件时出错: {ex.Message}",
+                        LogLevel.Error);
+                    throw;
                 }
 
-                // 去重（不同扩展名可能匹配到同一文件）
-                assetFiles = assetFiles.Distinct().ToList();
-
                 await _logService.LogAsync(
-                    $"扫描完成，共找到 {assetFiles.Count} 个资产文件",
+                    $"扫描完成，共找到 {candidateFiles.Count} 个候选资产文件",
                     LogLevel.Info);
 
                 // 报告最终进度
                 progress?.Report(new AssetScanProgress
                 {
-                    TotalAssets = assetFiles.Count,
+                    TotalAssets = candidateFiles.Count,
                     ProcessedAssets = 0,
                     ExtractedTexts = 0,
                     CurrentAsset = "扫描完成"
                 });
 
-                return assetFiles;
+                return candidateFiles;
             }
             catch (OperationCanceledException)
             {

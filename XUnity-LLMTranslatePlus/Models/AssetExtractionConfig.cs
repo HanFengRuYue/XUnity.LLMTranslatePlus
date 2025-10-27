@@ -25,10 +25,15 @@ namespace XUnity_LLMTranslatePlus.Models
 
         /// <summary>
         /// MonoBehaviour 字段名列表（指定要提取哪些字段的文本）
-        /// 常见字段名示例：text, dialogText, description, itemName, tooltipText, message, content
+        /// 注意：Unity 组件字段通常有 m_ 前缀（如 m_Text），自定义脚本可能无前缀（如 text）
         /// </summary>
         public List<string> MonoBehaviourFields { get; set; } = new List<string>
         {
+            // Unity 标准 UI 组件字段（带 m_ 前缀）
+            "m_Text",           // Unity UI Text 组件
+            "m_text",           // 小写变体
+
+            // 常见自定义脚本字段（无前缀）
             "text",
             "dialogText",
             "description",
@@ -37,7 +42,11 @@ namespace XUnity_LLMTranslatePlus.Models
             "message",
             "content",
             "title",
-            "subtitle"
+            "subtitle",
+            "dialogue",
+            "story",
+            "hint",
+            "tip"
         };
 
         /// <summary>
@@ -117,9 +126,14 @@ namespace XUnity_LLMTranslatePlus.Models
         public string Text { get; set; } = "";
 
         /// <summary>
-        /// 来源资产文件路径
+        /// 来源资产文件路径（完整路径）
         /// </summary>
         public string SourceAsset { get; set; } = "";
+
+        /// <summary>
+        /// 来源资产文件路径（相对于游戏目录的路径，用于UI显示）
+        /// </summary>
+        public string RelativeSourcePath { get; set; } = "";
 
         /// <summary>
         /// 来源资产类型（TextAsset, MonoBehaviour, GameObject 等）

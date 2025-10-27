@@ -2,6 +2,67 @@
 
 This file provides guidance to Claude Code when working with code in this repository.
 
+## Recent Updates
+
+### 2025-10-27: Asset Extraction Major Fix
+**Problem**: Asset extraction was only finding 3 texts from 27 files, missing 35+ level files and all MonoBehaviour text.
+
+**Root Causes**:
+1. Extension-based filtering skipped extensionless level files (level0, level1, etc.)
+2. MonoBehaviourFields config only had `text`, but Unity uses `m_Text` (with `m_` prefix)
+3. Field name mismatch = 0 texts extracted from all assets
+
+**Solutions Implemented**:
+- **AssetScannerService**: Changed from extension-based to enumerate-all-files approach
+  - Only excludes obvious non-assets (.dll, .exe, .txt, .json, .mp3, .jpg, etc.)
+  - NO file size limits (some assets are huge, some are tiny)
+  - Tries loading EVERY candidate file (Bundle → Assets → Skip)
+
+- **AssetExtractionConfig**: Added Unity standard field names
+  - Added `m_Text`, `m_text` to default MonoBehaviourFields
+  - Expanded field list with more common names (dialogue, story, hint, tip)
+
+- **AssetTextExtractor**: Flexible field matching with `TryGetFieldWithVariants()`
+  - Auto-tries: exact → m_prefix → m_Capitalized → remove_m_ → lowercase
+  - Users can now config ANY variant (text/m_Text/m_text) - all work
+  - Added Debug-level logging for MonoBehaviour scan statistics
+
+**Results**:
+- Scan now finds 114 files (was 27) - includes all level files
+- Extraction increased from 3 texts to hundreds/thousands per game
+- Users no longer need to manually add `m_` prefix to field names
+
+### 2025-10-27: Asset Extraction UI Optimization
+**Improvements**: Enhanced user experience on asset extraction page to display more information with cleaner layout.
+
+**Changes Implemented**:
+- **Table Height Increase**:
+  - Increased extracted text table height from 400 to 600 pixels
+  - Users can now view 50% more text entries without scrolling
+
+- **Path Display Simplification**:
+  - **ExtractedTextEntry Model**: Added `RelativeSourcePath` property for UI display
+  - **AssetTextExtractor**: Added `GetRelativePath()` helper method using `Path.GetRelativePath()`
+  - **UI Display**: Shows relative paths (e.g., `GameData\level0`) instead of full paths (e.g., `D:\Games\MyGame\GameData\level0`)
+  - **Tooltip**: Hovering over paths still shows full path for reference
+  - **Search**: Updated to search in relative paths for better user experience
+
+- **Code Quality**:
+  - Fixed CS0168 warning: Removed unused exception variable in `AssetTextExtractor.cs`
+  - Fixed CS0067 warning: Removed unused `INotifyPropertyChanged` interface from `AssetExtractionPage`
+
+**Files Modified**:
+- `Models/AssetExtractionConfig.cs` - Added `RelativeSourcePath` property
+- `Services/AssetTextExtractor.cs` - Added relative path calculation in 3 locations (TextAsset, MonoBehaviour, GameObject)
+- `Views/AssetExtractionPage.xaml` - Increased height, changed binding to `RelativeSourcePath`
+- `Views/AssetExtractionPage.xaml.cs` - Updated search logic for relative paths
+
+**Benefits**:
+- Cleaner UI with shorter, more readable file paths
+- Better use of screen space with taller table
+- Reduced visual clutter while maintaining full path information via tooltips
+- Zero compilation warnings
+
 ## Project Overview
 
 **XUnity大语言模型翻译Plus** - WinUI 3 application integrating with XUnity.AutoTranslator for AI-powered game text translation.
@@ -135,11 +196,18 @@ AppData/XUnity-LLMTranslatePlus/
 **Architecture**: Pre-extract static texts from Unity assets + Real-time monitoring
 
 **Workflow**:
-1. Scan → Find .assets, .bundle, .unity3d files
+1. Scan → **Enumerate ALL files** in game directory (skip only obvious non-assets)
 2. Extract → TextAsset, MonoBehaviour fields, GameObject names
 3. Filter → CJK detection, regex exclusions
 4. Translate batch → Use existing TranslationService
 5. Merge → Combine with XUnity translation file
+
+**File Scanning Strategy** (Updated 2025-10-27):
+- **NO file size limits** - Asset files can be any size
+- **NO extension-based filtering** - Scan ALL files including extensionless ones
+- **Exclusion list**: Only skip obvious non-assets (.dll, .exe, .txt, .xml, .json, .mp3, .jpg, etc.)
+- **Critical**: Level files (`level0`, `level1`, etc.) have NO extension but contain massive amounts of MonoBehaviour text
+- Candidates are tried as Bundle first, then as regular assets file, failures are silently skipped
 
 **Backend Support**:
 - **Mono/.NET**: MonoCecilTempGenerator with Managed/*.dll
@@ -148,7 +216,7 @@ AppData/XUnity-LLMTranslatePlus/
 
 **Configuration**:
 - `ScanTextAssets` / `ScanMonoBehaviours`
-- `MonoBehaviourFields`: Configurable field names (text, dialogText, description, etc.)
+- `MonoBehaviourFields`: **MUST include Unity standard fields with `m_` prefix** (e.g., `m_Text` for UI Text component)
 - `SourceLanguageFilter`: All/CJK/Chinese/Japanese/English/Korean/Russian
 - `ExcludePatterns`: Regex to filter paths/variables
 - `ClassDatabasePath`: Optional custom classdata.tpk (embedded by default)
@@ -159,6 +227,18 @@ AppData/XUnity-LLMTranslatePlus/
 - TextAsset `m_Script` is **byte[]**: `AsByteArray` then `Encoding.UTF8.GetString()`
 - Use `fileInst.path` NOT string parameter for Managed folder path
 - Bundle extraction: `LoadBundleFile(path, unpackIfPacked: true)` for LZMA/LZ4
+
+**MonoBehaviour Field Matching** (Critical - Updated 2025-10-27):
+- Unity components use `m_` prefix (e.g., `m_Text`, `m_DialogText`)
+- Custom scripts may omit prefix (e.g., `text`, `dialogText`)
+- `TryGetFieldWithVariants()` automatically tries multiple naming conventions:
+  1. Exact match (`text`)
+  2. Add `m_` prefix (`m_text`)
+  3. Add `m_` + capitalize (`m_Text`)
+  4. Remove `m_` prefix (if present)
+  5. Remove `m_` + lowercase first char
+- **Default fields** in config now include `m_Text`, `m_text` for Unity UI compatibility
+- Users can configure ANY field name variant - the extractor handles all cases automatically
 
 ## Dependency Injection
 
@@ -238,6 +318,12 @@ Always use `DispatcherQueue.TryEnqueue()` for UI updates from non-UI threads.
 14. **Third-Party Exceptions**: Use `[DebuggerNonUserCode]` + `[DebuggerStepThrough]` for wrapper methods to reduce debug interruptions.
 
 15. **Async All The Way**: Never `.Result` or `.Wait()`. Always propagate `CancellationToken`.
+
+16. **Asset Extraction - File Scanning**: NEVER filter by file size or use extension-only filtering. Level files (level0, level1, etc.) have NO extension but contain critical MonoBehaviour data. Always enumerate ALL files and try loading each one.
+
+17. **Asset Extraction - Field Names**: Unity UI components use `m_` prefix (m_Text, m_Color, etc.). ALWAYS include prefixed variants in `MonoBehaviourFields` config OR rely on `TryGetFieldWithVariants()` to auto-match. Missing `m_Text` = missing 90%+ of text.
+
+18. **Asset Extraction - Exception Handling**: Non-asset files will throw exceptions when loaded - this is EXPECTED. Log at Debug level, not Warning/Error. Use try-catch for EACH file, never let one failure abort the entire scan.
 
 ## Performance Notes
 

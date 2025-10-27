@@ -145,6 +145,8 @@ namespace XUnity_LLMTranslatePlus.Services
 
             var allExtractedTexts = new List<ExtractedTextEntry>();
             int processedCount = 0;
+            int successCount = 0;  // 成功加载的资产文件数
+            int skippedCount = 0;  // 跳过的非资产文件数
 
             foreach (var assetPath in assetFilePaths)
             {
@@ -152,10 +154,28 @@ namespace XUnity_LLMTranslatePlus.Services
 
                 try
                 {
+                    int textCountBefore = allExtractedTexts.Count;
                     var texts = await ExtractFromSingleAssetAsync(assetPath, cancellationToken);
                     allExtractedTexts.AddRange(texts);
 
                     processedCount++;
+
+                    // 判断是否成功加载资产文件
+                    if (texts.Count > 0)
+                    {
+                        successCount++;
+                        await _logService.LogAsync(
+                            $"已处理 {Path.GetFileName(assetPath)}: 提取 {texts.Count} 条文本",
+                            LogLevel.Info);
+                    }
+                    else
+                    {
+                        // 加载成功但没有提取到文本（可能是空资产或不包含目标类型）
+                        // 不增加 skippedCount，因为这是有效的资产文件
+                        await _logService.LogAsync(
+                            $"已处理 {Path.GetFileName(assetPath)}: 未找到文本",
+                            LogLevel.Debug);
+                    }
 
                     progress?.Report(new AssetScanProgress
                     {
@@ -164,22 +184,33 @@ namespace XUnity_LLMTranslatePlus.Services
                         ExtractedTexts = allExtractedTexts.Count,
                         CurrentAsset = Path.GetFileName(assetPath)
                     });
-
-                    await _logService.LogAsync(
-                        $"已处理 {Path.GetFileName(assetPath)}: 提取 {texts.Count} 条文本",
-                        LogLevel.Info);
                 }
                 catch (Exception ex)
                 {
+                    processedCount++;
+                    skippedCount++;
+
                     await _logService.LogAsync(
-                        $"处理资产文件失败 {Path.GetFileName(assetPath)}: {ex.Message}",
-                        LogLevel.Error);
+                        $"跳过文件 {Path.GetFileName(assetPath)}: {ex.Message}",
+                        LogLevel.Debug);
                     // 继续处理下一个文件
                 }
             }
 
             await _logService.LogAsync(
-                $"文本提取完成，共提取 {allExtractedTexts.Count} 条文本",
+                $"文本提取完成！统计信息：",
+                LogLevel.Info);
+            await _logService.LogAsync(
+                $"  - 候选文件: {assetFilePaths.Count} 个",
+                LogLevel.Info);
+            await _logService.LogAsync(
+                $"  - 有效资产文件: {successCount} 个",
+                LogLevel.Info);
+            await _logService.LogAsync(
+                $"  - 跳过的文件: {skippedCount} 个",
+                LogLevel.Info);
+            await _logService.LogAsync(
+                $"  - 提取文本总数: {allExtractedTexts.Count} 条",
                 LogLevel.Info);
 
             return allExtractedTexts;
@@ -265,29 +296,41 @@ namespace XUnity_LLMTranslatePlus.Services
                         $"作为 Bundle 加载失败，尝试作为普通资产文件: {ex.Message}",
                         LogLevel.Debug);
 
-                    // 加载普通资产文件（使用 FileShare.ReadWrite 允许 XUnity 并发访问）
-                    await using var fileStream = new FileStream(
-                        assetFilePath,
-                        FileMode.Open,
-                        FileAccess.Read,
-                        FileShare.ReadWrite,
-                        4096,
-                        FileOptions.Asynchronous);
+                    try
+                    {
+                        // 加载普通资产文件（使用 FileShare.ReadWrite 允许 XUnity 并发访问）
+                        await using var fileStream = new FileStream(
+                            assetFilePath,
+                            FileMode.Open,
+                            FileAccess.Read,
+                            FileShare.ReadWrite,
+                            4096,
+                            FileOptions.Asynchronous);
 
-                    assetsFileInstance = _assetsManager.LoadAssetsFile(fileStream, assetFilePath, true);
-                    var texts = await ExtractFromAssetsFileAsync(assetsFileInstance, assetFilePath);
-                    extractedTexts.AddRange(texts);
+                        assetsFileInstance = _assetsManager.LoadAssetsFile(fileStream, assetFilePath, true);
+                        var texts = await ExtractFromAssetsFileAsync(assetsFileInstance, assetFilePath);
+                        extractedTexts.AddRange(texts);
 
-                    await _logService.LogAsync(
-                        $"从普通资产文件提取 {texts.Count} 条文本: {Path.GetFileName(assetFilePath)}",
-                        LogLevel.Info);
+                        await _logService.LogAsync(
+                            $"从普通资产文件提取 {texts.Count} 条文本: {Path.GetFileName(assetFilePath)}",
+                            LogLevel.Info);
+                    }
+                    catch (Exception)
+                    {
+                        // 既不是 Bundle 也不是普通资产文件，可能是其他类型的文件
+                        // 降低日志级别为 Debug，避免大量 Warning
+                        await _logService.LogAsync(
+                            $"跳过非资产文件: {Path.GetFileName(assetFilePath)}",
+                            LogLevel.Debug);
+                    }
                 }
             }
             catch (Exception ex)
             {
+                // 外层异常捕获（文件访问异常等）
                 await _logService.LogAsync(
-                    $"加载资产文件失败: {Path.GetFileName(assetFilePath)} - {ex.Message}",
-                    LogLevel.Warning);
+                    $"处理文件时出错: {Path.GetFileName(assetFilePath)} - {ex.Message}",
+                    LogLevel.Debug);
             }
 
             return extractedTexts;
@@ -339,6 +382,7 @@ namespace XUnity_LLMTranslatePlus.Services
                                 {
                                     Text = text,
                                     SourceAsset = sourceAsset,
+                                    RelativeSourcePath = GetRelativePath(sourceAsset),
                                     AssetType = "TextAsset",
                                     FieldName = $"m_Script ({name})"
                                 });
@@ -360,6 +404,9 @@ namespace XUnity_LLMTranslatePlus.Services
                     await CheckAndSetMonoTempGeneratorsAsync(assetsFile);
 
                     var monoBehaviours = assetsFile.file.GetAssetsOfType(AssetClassID.MonoBehaviour);
+                    int monoBehaviourCount = 0;
+                    int textFieldsFound = 0;
+
                     foreach (var assetInfo in monoBehaviours)
                     {
                         // 安全地获取 BaseField（内部会捕获 MonoCecil 异常）
@@ -367,33 +414,35 @@ namespace XUnity_LLMTranslatePlus.Services
                         if (baseField == null)
                             continue; // 跳过无法解析的 MonoBehaviour
 
+                        monoBehaviourCount++;
+
                         try
                         {
-
                             // 遍历配置的字段名
                             foreach (var fieldName in _config.MonoBehaviourFields)
                             {
-                                try
+                                // 尝试多种字段名变体
+                                var field = TryGetFieldWithVariants(baseField, fieldName);
+
+                                if (field != null && !field.IsDummy && field.TypeName == "string")
                                 {
-                                    var field = baseField[fieldName];
-                                    if (field != null && !field.IsDummy && field.TypeName == "string")
+                                    var text = field.AsString;
+                                    if (!string.IsNullOrWhiteSpace(text) && IsValidText(text))
                                     {
-                                        var text = field.AsString;
-                                        if (!string.IsNullOrWhiteSpace(text) && IsValidText(text))
+                                        extractedTexts.Add(new ExtractedTextEntry
                                         {
-                                            extractedTexts.Add(new ExtractedTextEntry
-                                            {
-                                                Text = text,
-                                                SourceAsset = sourceAsset,
-                                                AssetType = "MonoBehaviour",
-                                                FieldName = fieldName
-                                            });
-                                        }
+                                            Text = text,
+                                            SourceAsset = sourceAsset,
+                                            RelativeSourcePath = GetRelativePath(sourceAsset),
+                                            AssetType = "MonoBehaviour",
+                                            FieldName = fieldName
+                                        });
+                                        textFieldsFound++;
+
+                                        await _logService.LogAsync(
+                                            $"找到文本字段 '{fieldName}' (PathId: {assetInfo.PathId}): {text.Substring(0, Math.Min(50, text.Length))}...",
+                                            LogLevel.Debug);
                                     }
-                                }
-                                catch
-                                {
-                                    // 字段不存在，继续下一个
                                 }
                             }
                         }
@@ -404,6 +453,13 @@ namespace XUnity_LLMTranslatePlus.Services
                                 $"提取 MonoBehaviour 字段失败 (PathId: {assetInfo.PathId}): {ex.Message}",
                                 LogLevel.Debug);
                         }
+                    }
+
+                    if (monoBehaviourCount > 0)
+                    {
+                        await _logService.LogAsync(
+                            $"资产文件 {Path.GetFileName(sourceAsset)}: 扫描 {monoBehaviourCount} 个 MonoBehaviour，找到 {textFieldsFound} 个文本字段",
+                            LogLevel.Debug);
                     }
                 }
 
@@ -424,6 +480,7 @@ namespace XUnity_LLMTranslatePlus.Services
                                 {
                                     Text = name,
                                     SourceAsset = sourceAsset,
+                                    RelativeSourcePath = GetRelativePath(sourceAsset),
                                     AssetType = "GameObject",
                                     FieldName = "m_Name"
                                 });
@@ -446,6 +503,24 @@ namespace XUnity_LLMTranslatePlus.Services
             }
 
             return extractedTexts;
+        }
+
+        /// <summary>
+        /// 获取相对于游戏目录的路径
+        /// </summary>
+        private string GetRelativePath(string fullPath)
+        {
+            if (string.IsNullOrEmpty(_gameDirectory) || string.IsNullOrEmpty(fullPath))
+                return fullPath;
+
+            try
+            {
+                return Path.GetRelativePath(_gameDirectory, fullPath);
+            }
+            catch
+            {
+                return fullPath;
+            }
         }
 
         /// <summary>
@@ -642,6 +717,77 @@ namespace XUnity_LLMTranslatePlus.Services
                 // 返回 null 表示该 MonoBehaviour 无法解析
                 return null;
             }
+        }
+
+        /// <summary>
+        /// 尝试使用多种字段名变体获取字段
+        /// 支持：原始名称、m_前缀、首字母大写等变体
+        /// </summary>
+        private AssetTypeValueField? TryGetFieldWithVariants(AssetTypeValueField baseField, string fieldName)
+        {
+            // 1. 尝试原始字段名
+            try
+            {
+                var field = baseField[fieldName];
+                if (field != null && !field.IsDummy)
+                    return field;
+            }
+            catch { }
+
+            // 2. 如果字段名不以 m_ 开头，尝试添加 m_ 前缀
+            if (!fieldName.StartsWith("m_", StringComparison.Ordinal))
+            {
+                try
+                {
+                    var field = baseField[$"m_{fieldName}"];
+                    if (field != null && !field.IsDummy)
+                        return field;
+                }
+                catch { }
+
+                // 3. 尝试 m_ + 首字母大写
+                if (fieldName.Length > 0)
+                {
+                    try
+                    {
+                        var capitalized = char.ToUpper(fieldName[0]) + fieldName.Substring(1);
+                        var field = baseField[$"m_{capitalized}"];
+                        if (field != null && !field.IsDummy)
+                            return field;
+                    }
+                    catch { }
+                }
+            }
+
+            // 4. 如果字段名以 m_ 开头，尝试移除 m_ 前缀
+            if (fieldName.StartsWith("m_", StringComparison.Ordinal) && fieldName.Length > 2)
+            {
+                try
+                {
+                    var withoutPrefix = fieldName.Substring(2);
+                    var field = baseField[withoutPrefix];
+                    if (field != null && !field.IsDummy)
+                        return field;
+                }
+                catch { }
+
+                // 5. 尝试移除 m_ 后首字母小写
+                try
+                {
+                    var withoutPrefix = fieldName.Substring(2);
+                    if (withoutPrefix.Length > 0)
+                    {
+                        var lowercased = char.ToLower(withoutPrefix[0]) + withoutPrefix.Substring(1);
+                        var field = baseField[lowercased];
+                        if (field != null && !field.IsDummy)
+                            return field;
+                    }
+                }
+                catch { }
+            }
+
+            // 未找到匹配的字段
+            return null;
         }
 
         /// <summary>

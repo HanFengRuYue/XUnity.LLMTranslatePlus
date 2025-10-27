@@ -240,7 +240,7 @@
                     <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
                             CornerRadius="8"
-                            Height="400">
+                            Height="600">
                         <ListView x:Name="ExtractedTextsListView"
                                   SelectionMode="Extended"
                                   SelectionChanged="ExtractedTextsListView_SelectionChanged">
@@ -283,7 +283,7 @@
                                                    TextWrapping="Wrap"
                                                    ToolTipService.ToolTip="{Binding Text}"/>
                                         <TextBlock Grid.Column="1"
-                                                   Text="{Binding SourceAsset}"
+                                                   Text="{Binding RelativeSourcePath}"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTipService.ToolTip="{Binding SourceAsset}"/>
                                         <TextBlock Grid.Column="2"

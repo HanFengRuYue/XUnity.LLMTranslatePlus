@@ -18,7 +18,7 @@ using XUnity_LLMTranslatePlus.Services;
 
 namespace XUnity_LLMTranslatePlus.Views
 {
-    public sealed partial class AssetExtractionPage : Page, INotifyPropertyChanged
+    public sealed partial class AssetExtractionPage : Page
     {
         private readonly AssetScannerService? _scannerService;
         private readonly PreTranslationService? _preTranslationService;
@@ -33,8 +33,6 @@ namespace XUnity_LLMTranslatePlus.Views
         // 自动保存定时器
         private DispatcherQueueTimer? _autoSaveTimer;
         private bool _isLoadingConfig = false;
-
-        public event PropertyChangedEventHandler? PropertyChanged;
 
         public AssetExtractionPage()
         {
@@ -467,7 +465,7 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 _filteredTexts = _extractedTexts
                     .Where(t => t.Text.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-                                t.SourceAsset.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+                                t.RelativeSourcePath.Contains(searchText, StringComparison.OrdinalIgnoreCase))
                     .ToList();
             }
 
