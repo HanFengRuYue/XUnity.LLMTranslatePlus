@@ -51,6 +51,7 @@ namespace XUnity_LLMTranslatePlus
             services.AddSingleton<HotkeyService>();
             services.AddSingleton<AssetScannerService>();   // 资产扫描服务
             services.AddSingleton<PreTranslationService>(); // 预翻译服务
+            services.AddSingleton<TaskbarProgressService>(); // 任务栏进度服务
 
             _serviceProvider = services.BuildServiceProvider();
 

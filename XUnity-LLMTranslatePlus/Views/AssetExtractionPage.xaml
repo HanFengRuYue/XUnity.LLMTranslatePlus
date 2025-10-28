@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:CommunityToolkit.WinUI.UI.Controls"
     mc:Ignorable="d">
 
     <Grid>
@@ -212,7 +213,7 @@
                                            Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
                             </StackPanel>
                             <ListView x:Name="ExcludeFieldNamesListView"
-                                      Height="150"
+                                      Height="300"
                                       BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                       BorderThickness="1"
                                       CornerRadius="4"
@@ -272,7 +273,7 @@
                                            Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
                             </StackPanel>
                             <ListView x:Name="ExcludePatternsListView"
-                                      Height="200"
+                                      Height="300"
                                       BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                       BorderThickness="1"
                                       CornerRadius="4"
@@ -404,73 +405,48 @@
                             BorderThickness="1"
                             CornerRadius="8"
                             Height="600">
-                        <ListView x:Name="ExtractedTextsListView"
-                                  SelectionMode="Extended"
-                                  SelectionChanged="ExtractedTextsListView_SelectionChanged">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Padding" Value="0"/>
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.HeaderTemplate>
-                                <DataTemplate>
-                                    <Grid Padding="12,8" ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="3*" MinWidth="200"/>
-                                            <ColumnDefinition Width="2*" MinWidth="150"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="120"/>
-                                        </Grid.ColumnDefinitions>
+                        <controls:DataGrid x:Name="ExtractedTextsDataGrid"
+                                          AutoGenerateColumns="False"
+                                          CanUserResizeColumns="True"
+                                          CanUserSortColumns="True"
+                                          GridLinesVisibility="Horizontal"
+                                          HeadersVisibility="Column"
+                                          SelectionMode="Extended"
+                                          IsReadOnly="True"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Auto"
+                                          SelectionChanged="ExtractedTextsDataGrid_SelectionChanged">
 
-                                        <TextBlock Grid.Column="0" Text="原文" FontWeight="SemiBold" Opacity="0.7"/>
-                                        <TextBlock Grid.Column="1" Text="来源文件" FontWeight="SemiBold" Opacity="0.7"/>
-                                        <TextBlock Grid.Column="2" Text="类型" FontWeight="SemiBold" Opacity="0.7"/>
-                                        <TextBlock Grid.Column="3" Text="字段名" FontWeight="SemiBold" Opacity="0.7"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.HeaderTemplate>
+                            <!-- 右键菜单 -->
+                            <controls:DataGrid.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="📋 复制原文" Click="CopyTextMenuItem_Click"/>
+                                    <MenuFlyoutItem Text="📄 复制字段路径" Click="CopyFieldPathMenuItem_Click"/>
+                                    <MenuFlyoutItem Text="📁 复制来源文件" Click="CopySourcePathMenuItem_Click"/>
+                                    <MenuFlyoutSeparator/>
+                                    <MenuFlyoutItem Text="➕ 添加字段名到黑名单" Click="AddFieldToBlacklistMenuItem_Click"/>
+                                    <MenuFlyoutItem Text="🚫 添加到排除模式" Click="AddToExcludePatternMenuItem_Click"/>
+                                </MenuFlyout>
+                            </controls:DataGrid.ContextFlyout>
 
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Padding="12,8" ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="3*" MinWidth="200"/>
-                                            <ColumnDefinition Width="2*" MinWidth="150"/>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="120"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <!-- 右键菜单 -->
-                                        <Grid.ContextFlyout>
-                                            <MenuFlyout>
-                                                <MenuFlyoutItem Text="📋 复制原文" Click="CopyTextMenuItem_Click"/>
-                                                <MenuFlyoutItem Text="📄 复制字段路径" Click="CopyFieldPathMenuItem_Click"/>
-                                                <MenuFlyoutItem Text="📁 复制来源文件" Click="CopySourcePathMenuItem_Click"/>
-                                                <MenuFlyoutSeparator/>
-                                                <MenuFlyoutItem Text="➕ 添加字段名到黑名单" Click="AddFieldToBlacklistMenuItem_Click"/>
-                                                <MenuFlyoutItem Text="🚫 添加到排除模式" Click="AddToExcludePatternMenuItem_Click"/>
-                                            </MenuFlyout>
-                                        </Grid.ContextFlyout>
-
-                                        <!-- 原文列 -->
-                                        <TextBlock Grid.Column="0"
-                                                   Text="{Binding Text}"
-                                                   TextWrapping="Wrap"
-                                                   ToolTipService.ToolTip="{Binding Text}"/>
-                                        <TextBlock Grid.Column="1"
-                                                   Text="{Binding RelativeSourcePath}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   ToolTipService.ToolTip="{Binding SourceAsset}"/>
-                                        <TextBlock Grid.Column="2"
-                                                   Text="{Binding AssetType}"/>
-                                        <TextBlock Grid.Column="3"
-                                                   Text="{Binding FieldName}"
-                                                   Opacity="{Binding FieldNameOpacity}"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                            <!-- 列定义 -->
+                            <controls:DataGrid.Columns>
+                                <controls:DataGridTextColumn Header="原文"
+                                                            Binding="{Binding Text}"
+                                                            Width="3*"
+                                                            MinWidth="200"/>
+                                <controls:DataGridTextColumn Header="来源文件"
+                                                            Binding="{Binding RelativeSourcePath}"
+                                                            Width="2*"
+                                                            MinWidth="150"/>
+                                <controls:DataGridTextColumn Header="类型"
+                                                            Binding="{Binding AssetType}"
+                                                            Width="100"/>
+                                <controls:DataGridTextColumn Header="字段名"
+                                                            Binding="{Binding FieldName}"
+                                                            Width="120"/>
+                            </controls:DataGrid.Columns>
+                        </controls:DataGrid>
                     </Border>
                 </StackPanel>
 

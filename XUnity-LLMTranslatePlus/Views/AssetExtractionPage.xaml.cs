@@ -24,6 +24,7 @@ namespace XUnity_LLMTranslatePlus.Views
         private readonly PreTranslationService? _preTranslationService;
         private readonly ConfigService? _configService;
         private readonly LogService? _logService;
+        private readonly TaskbarProgressService? _taskbarProgressService;
 
         private List<ExtractedTextEntry> _extractedTexts = new List<ExtractedTextEntry>();
         private List<ExtractedTextEntry> _filteredTexts = new List<ExtractedTextEntry>();
@@ -48,6 +49,7 @@ namespace XUnity_LLMTranslatePlus.Views
             _preTranslationService = App.GetService<PreTranslationService>();
             _configService = App.GetService<ConfigService>();
             _logService = App.GetService<LogService>();
+            _taskbarProgressService = App.GetService<TaskbarProgressService>();
 
             // 初始化自动保存定时器
             _autoSaveTimer = DispatcherQueue.CreateTimer();
@@ -407,6 +409,9 @@ namespace XUnity_LLMTranslatePlus.Views
                                     ProgressBar.Value = p.ProgressPercentage;
                                     ProgressPanel.Visibility = Visibility.Visible;
                                     ProgressText.Text = $"扫描资产文件... {p.ProcessedAssets}/{p.TotalAssets}";
+
+                                    // 同步任务栏进度
+                                    _taskbarProgressService?.ShowProgress(p.ProgressPercentage / 100.0);
                                 });
                             }),
                             _cancellationTokenSource.Token);
@@ -438,6 +443,9 @@ namespace XUnity_LLMTranslatePlus.Views
                 ProgressText.Text = "正在提取文本...";
                 ProgressBar.IsIndeterminate = true;
 
+                // 显示不确定任务栏进度
+                _taskbarProgressService?.ShowIndeterminate();
+
                 var extractResult = await Task.Run(async () =>
                 {
                     try
@@ -453,6 +461,9 @@ namespace XUnity_LLMTranslatePlus.Views
                                     ProgressBar.IsIndeterminate = false;
                                     ProgressBar.Value = p.ProgressPercentage;
                                     ProgressText.Text = $"提取文本... {p.ProcessedAssets}/{p.TotalAssets} ({p.ExtractedTexts} 条文本)";
+
+                                    // 同步任务栏进度
+                                    _taskbarProgressService?.ShowProgress(p.ProgressPercentage / 100.0);
                                 });
                             }),
                             _cancellationTokenSource.Token);
@@ -494,6 +505,9 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 ProgressPanel.Visibility = Visibility.Collapsed;
                 SetUIBusy(false);
+
+                // 隐藏任务栏进度
+                _taskbarProgressService?.HideProgress();
             }
         }
 
@@ -505,7 +519,7 @@ namespace XUnity_LLMTranslatePlus.Views
             }
 
             // 获取选中的文本
-            var selectedTexts = ExtractedTextsListView.SelectedItems.Cast<ExtractedTextEntry>().ToList();
+            var selectedTexts = ExtractedTextsDataGrid.SelectedItems.Cast<ExtractedTextEntry>().ToList();
             if (selectedTexts.Count == 0)
             {
                 await _logService.LogAsync("未选择任何文本进行翻译", LogLevel.Warning);
@@ -532,6 +546,9 @@ namespace XUnity_LLMTranslatePlus.Views
                             ProgressBar.Value = p.ProgressPercentage;
                             ProgressPanel.Visibility = Visibility.Visible;
                             ProgressText.Text = p.CurrentStep;
+
+                            // 同步任务栏进度
+                            _taskbarProgressService?.ShowProgress(p.ProgressPercentage / 100.0);
                         });
                     }),
                     _cancellationTokenSource.Token);
@@ -559,6 +576,9 @@ namespace XUnity_LLMTranslatePlus.Views
             {
                 ProgressPanel.Visibility = Visibility.Collapsed;
                 SetUIBusy(false);
+
+                // 隐藏任务栏进度
+                _taskbarProgressService?.HideProgress();
             }
         }
 
@@ -638,7 +658,7 @@ namespace XUnity_LLMTranslatePlus.Views
                     .ToList();
             }
 
-            ExtractedTextsListView.ItemsSource = _filteredTexts;
+            ExtractedTextsDataGrid.ItemsSource = _filteredTexts;
             ExtractedTextsPanel.Visibility = _extractedTexts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
             UpdateExtractedTextsStats();
@@ -648,7 +668,7 @@ namespace XUnity_LLMTranslatePlus.Views
         {
             var totalCount = _extractedTexts.Count;
             var filteredCount = _filteredTexts.Count;
-            var selectedCount = ExtractedTextsListView.SelectedItems.Count;
+            var selectedCount = ExtractedTextsDataGrid.SelectedItems.Count;
 
             if (totalCount == filteredCount)
             {
@@ -667,17 +687,24 @@ namespace XUnity_LLMTranslatePlus.Views
 
         private void SelectAllButton_Click(object sender, RoutedEventArgs e)
         {
-            ExtractedTextsListView.SelectAll();
+            // DataGrid不支持SelectAll()，手动选择所有项
+            if (ExtractedTextsDataGrid.ItemsSource != null)
+            {
+                foreach (var item in _filteredTexts)
+                {
+                    ExtractedTextsDataGrid.SelectedItems.Add(item);
+                }
+            }
             UpdateExtractedTextsStats();
         }
 
         private void DeselectAllButton_Click(object sender, RoutedEventArgs e)
         {
-            ExtractedTextsListView.SelectedItems.Clear();
+            ExtractedTextsDataGrid.SelectedItems.Clear();
             UpdateExtractedTextsStats();
         }
 
-        private void ExtractedTextsListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void ExtractedTextsDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateExtractedTextsStats();
         }

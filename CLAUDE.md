@@ -4,6 +4,87 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Recent Updates
 
+### 2025-10-28: DataGrid Column Resizing & Taskbar Progress Integration
+**Feature**: Implemented resizable table columns and Windows taskbar progress indicator synchronization.
+
+**Problem Identified**:
+- Fixed-width columns in extraction results table prevented users from viewing long text content
+- No visual feedback for long-running operations when window is minimized
+- Users had to keep window focused to monitor progress
+
+**Solutions Implemented**:
+
+**1. DataGrid Column Resizing** (AssetExtractionPage.xaml:408-449):
+- **Replaced ListView with DataGrid** from CommunityToolkit.WinUI.UI.Controls
+- **Key Features**:
+  - `CanUserResizeColumns="True"` - Drag column borders to resize
+  - `CanUserSortColumns="True"` - Click headers to sort
+  - Star-sized columns with minimum widths (e.g., `Width="3*" MinWidth="200"`)
+  - Professional grid appearance with horizontal lines
+  - Preserved all existing functionality (right-click menu, selection, search)
+- **Column Configuration**:
+  - Original Text: 3* width, 200px minimum
+  - Source File: 2* width, 150px minimum
+  - Type: 100px fixed
+  - Field Name: 120px fixed
+- **Code Adjustments** (AssetExtractionPage.xaml.cs):
+  - Renamed `ExtractedTextsListView` → `ExtractedTextsDataGrid`
+  - Updated all references: `SelectedItems`, `SelectionChanged`, `ItemsSource`
+  - Implemented manual SelectAll (DataGrid doesn't have built-in method)
+  - Right-click menu works seamlessly via DataContext binding
+
+**2. Taskbar Progress Service** (Services/TaskbarProgressService.cs):
+- **Win32 COM Interop Implementation**:
+  - P/Invoke declarations for `ITaskbarList3` interface
+  - Supports all Windows taskbar progress states
+- **API Methods**:
+  - `Initialize(IntPtr windowHandle)` - Setup with HWND
+  - `ShowProgress(double value)` - Normal progress (green, 0.0-1.0)
+  - `ShowIndeterminate()` - Indeterminate progress (scrolling)
+  - `ShowPaused(double value)` - Paused state (yellow)
+  - `ShowError(double value)` - Error state (red)
+  - `HideProgress()` - Clear progress indicator
+- **Error Handling**: Graceful degradation if COM initialization fails
+
+**3. Service Integration**:
+- **App.xaml.cs**: Registered TaskbarProgressService as singleton
+- **MainWindow.xaml.cs:59-81**:
+  - Added `InitializeTaskbarProgress()` method
+  - Obtains window handle via `WindowNative.GetWindowHandle(this)`
+  - Initializes service on window startup
+- **AssetExtractionPage.xaml.cs**:
+  - Injected TaskbarProgressService via DI
+  - **Scan Progress** (Lines 413-414): Syncs percentage to taskbar
+  - **Extract Progress** (Lines 446-447): Shows indeterminate, then syncs percentage (Lines 465-466)
+  - **Translate Progress** (Lines 547-548): Real-time sync
+  - **Cleanup** (Lines 509-510, 580-581): Hides progress on completion/cancel
+
+**Technical Details**:
+- **NuGet Package**: CommunityToolkit.WinUI.UI.Controls.DataGrid v7.1.2
+- **COM Interface**: ITaskbarList3 (shobjidl_core.h) via P/Invoke
+- **Progress Values**: UI uses 0-100, taskbar uses 0.0-1.0, service handles conversion
+- **Thread Safety**: All UI updates via `DispatcherQueue.TryEnqueue()`
+
+**User Experience Improvements**:
+- 🖱️ Drag column separators to customize table layout
+- 📊 Click column headers to sort extraction results
+- 🎯 Taskbar icon shows real-time progress (scan/extract/translate)
+- 👀 Monitor progress without switching windows
+- 🎨 Color-coded states (green=normal, yellow=paused, red=error)
+- ✨ Native Windows integration - works with taskbar thumbnails
+
+**Files Modified**:
+- `XUnity-LLMTranslatePlus.csproj` - Added DataGrid NuGet reference
+- `Services/TaskbarProgressService.cs` - **NEW FILE**
+- `App.xaml.cs` - Service registration
+- `MainWindow.xaml.cs` - Taskbar service initialization
+- `Views/AssetExtractionPage.xaml` - ListView → DataGrid migration
+- `Views/AssetExtractionPage.xaml.cs` - Event handling + progress sync
+
+**Build Status**: ✅ 0 Warnings, 0 Errors
+
+---
+
 ### 2025-10-27: Asset Extraction Context Menu & Pattern Management
 **Improvement**: Added comprehensive right-click menu and exclude pattern management for extraction results.
 

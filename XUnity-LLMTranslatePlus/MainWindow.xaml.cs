@@ -5,6 +5,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
+using WinRT.Interop;
+using XUnity_LLMTranslatePlus.Services;
 using XUnity_LLMTranslatePlus.Views;
 
 namespace XUnity_LLMTranslatePlus
@@ -52,6 +54,30 @@ namespace XUnity_LLMTranslatePlus
             // 默认导航到主页
             NavView.SelectedItem = NavView.MenuItems[0];
             ContentFrame.Navigate(typeof(HomePage));
+
+            // 初始化任务栏进度服务
+            InitializeTaskbarProgress();
+        }
+
+        /// <summary>
+        /// 初始化任务栏进度服务
+        /// </summary>
+        private void InitializeTaskbarProgress()
+        {
+            try
+            {
+                var taskbarService = App.GetService<TaskbarProgressService>();
+                if (taskbarService != null)
+                {
+                    // 获取窗口句柄
+                    var windowHandle = WindowNative.GetWindowHandle(this);
+                    taskbarService.Initialize(windowHandle);
+                }
+            }
+            catch
+            {
+                // 静默失败 - 任务栏进度是可选功能
+            }
         }
 
         /// <summary>
