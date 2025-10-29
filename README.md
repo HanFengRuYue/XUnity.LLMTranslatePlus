@@ -7,13 +7,13 @@
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
 [![WinUI 3](https://img.shields.io/badge/WinUI-3.0-0078D4)](https://github.com/microsoft/microsoft-ui-xaml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/your-repo/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/HanFengRuYue/XUnity.LLMTranslatePlus/releases)
 
 </div>
 
 ## 最近更新
 
-### v1.2.0 (2025-10-29)
+### v2.0.0 (2025-10-29)
 
 - **Unity 资源提取功能**：从游戏资源文件中提取可翻译文本
   - 支持 Mono/.NET 和 IL2CPP 后端
