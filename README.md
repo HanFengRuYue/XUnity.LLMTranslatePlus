@@ -7,7 +7,7 @@
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
 [![WinUI 3](https://img.shields.io/badge/WinUI-3.0-0078D4)](https://github.com/microsoft/microsoft-ui-xaml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/your-repo/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/your-repo/releases)
 
 </div>
 
