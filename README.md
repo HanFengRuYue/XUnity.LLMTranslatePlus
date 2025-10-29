@@ -7,33 +7,54 @@
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
 [![WinUI 3](https://img.shields.io/badge/WinUI-3.0-0078D4)](https://github.com/microsoft/microsoft-ui-xaml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/your-repo/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/your-repo/releases)
 
 </div>
 
+## 最近更新
+
+### v1.2.0 (2025-10-29)
+
+- **Unity 资源提取功能**：从游戏资源文件中提取可翻译文本
+  - 支持 Mono/.NET 和 IL2CPP 后端
+  - 智能字段扫描和技术数据过滤
+  - 右键菜单和智能正则生成
+- **UI 改进**：
+  - DataGrid 替换 ListView，支持列调整和排序
+  - 任务栏进度集成（扫描/提取/翻译操作）
+  - 主题切换标准化为 NavigationViewItem
+- **术语功能增强**：添加实时搜索和过滤功能
+- **性能优化**：相对路径显示，表格高度增加至 600px
+
 ## 功能特性
 
+### 核心翻译功能
+
 - **AI 智能翻译**：支持多种大语言模型 API（OpenAI、Claude、Gemini 等兼容接口）
-  - API 地址智能补全（自动添加 `/v1/chat/completions`）
-  - 连接测试和错误诊断
-  - 速率限制自动重试（指数退避 + 随机抖动）
 - **实时文件监控**：自动检测游戏翻译文件变化，即时翻译新增文本
-  - 200ms 稳定延迟，避免重复读取
-  - 智能批处理（0.5s 或 2 条记录）
-  - 打字机效果文本聚合，避免中断翻译
 - **高性能并发**：可配置并发数（1-100），智能批量写入，避免文件锁冲突
 - **上下文感知**：翻译时携带历史上下文（可配置 1-100 条），提升翻译连贯性
-- **智能术语管理**：
-  - AI 自动提取专有名词（人名、地名、技能名等）
-  - 多术语库支持，可创建/切换/删除术语库
-  - 按优先级和长度智能应用
-  - 术语 CSV 导入/导出
+- **智能术语管理**：多术语库支持，可创建/切换/删除术语库
 - **特殊字符处理**：智能识别并保护转义字符（`\n`、`\r`、`\t`）和特殊符号
-- **可视化界面**：WinUI 3 现代化界面，实时查看翻译进度和日志
-  - 实时统计：总翻译数、待翻译数、翻译中数、失败数
-  - 最近 8 条翻译记录展示
-  - 日志过滤（Info/Warning/Error/Debug）
-- **安全性**：API 密钥使用 Windows DPAPI 加密存储
+
+### Unity 资源提取功能
+
+- **智能资源扫描**：从 Unity 游戏资源文件中提取可翻译文本
+  - 支持 **Mono/.NET** 和 **IL2CPP** 后端
+  - 自动检测 Bundle 文件和资源包
+  - 无文件大小限制，支持大型关卡文件（level0、level1 等）
+- **MonoBehaviour 字段扫描**：
+  - **指定字段模式**：扫描配置的字段（如 m_Text、m_Name）
+  - **全字段智能模式**：递归扫描所有字符串字段，自动过滤技术数据
+    - 8 种启发式规则过滤 GUID、路径、URL、十六进制、Base64 等
+    - 可配置递归深度（1-5 层，默认 3 层）
+    - 字段黑名单排除（guid、id、path、url 等）
+- **高级功能**：
+  - 右键菜单：复制文本/路径/文件名、添加字段到黑名单
+  - 智能正则生成：自动识别 JSON、坐标、UUID 等模式
+  - 排除模式管理：自定义正则表达式过滤不需要翻译的文本
+  - DataGrid 可调整列宽和排序
+- **导出集成**：一键导出到 XUnity 翻译文件格式
 
 ## 系统要求
 
@@ -53,7 +74,7 @@
 winget install Microsoft.DotNet.DesktopRuntime.9
 
 # 安装 Windows App SDK 1.8 Runtime
-# 从 Microsoft 官网下载安装包
+[从 Microsoft 官网下载安装包](https://learn.microsoft.com/windows/apps/windows-app-sdk/downloads)
 ```
 
 ### 2. 配置 API
@@ -89,6 +110,30 @@ winget install Microsoft.DotNet.DesktopRuntime.9
    - 总翻译数、待翻译数、翻译中数、失败数
    - 最近 8 条翻译记录
 5. 在 **日志监控** 页面查看详细日志
+
+### 6. Unity 资源提取（可选）
+
+如果游戏文本在资源文件中，可以使用资源提取功能：
+
+1. 进入 **资源提取** 页面
+2. 选择游戏数据目录（通常包含以下文件之一）：
+   - **Mono/.NET**: `Managed` 文件夹（包含 .dll 文件）
+   - **IL2CPP**: `global-metadata.dat` 和 `GameAssembly.dll`
+3. 配置扫描选项：
+   - **扫描模式**：
+     - **指定字段模式**：仅扫描配置的字段（快速，适合已知字段名）
+     - **全字段智能模式**：递归扫描所有字符串，自动过滤技术数据（全面）
+   - **递归深度**（全字段模式）：1-5 层，默认 3 层
+   - **MonoBehaviour 字段**：添加要扫描的字段名（如 `m_Text`、`m_Name`）
+4. 点击 **扫描资源文件** 开始提取
+5. 在结果表格中：
+   - 查看提取的文本和来源路径
+   - 右键菜单：复制、添加到黑名单、生成智能正则
+   - 调整列宽和排序
+6. 配置排除模式（可选）：
+   - 添加正则表达式过滤不需要翻译的文本
+   - 使用智能正则生成功能快速创建模式
+7. 点击 **导出到翻译文件** 保存为 XUnity 格式
 
 ## 构建说明
 
@@ -126,14 +171,14 @@ dotnet publish --configuration Release --runtime win-x64 --self-contained false 
   ```
   Release/
   ├── win-x86/
-  │   └── XUnity-LLMTranslatePlus.exe          (~40MB)
+  │   └── XUnity-LLMTranslatePlus.exe
   ├── win-x64/
-  │   └── XUnity-LLMTranslatePlus.exe          (~40MB)
+  │   └── XUnity-LLMTranslatePlus.exe
   ├── win-arm64/
-  │   └── XUnity-LLMTranslatePlus.exe          (~40MB)
-  ├── XUnity-LLMTranslatePlus-win-x86.zip      (~10MB)
-  ├── XUnity-LLMTranslatePlus-win-x64.zip      (~10MB)
-  └── XUnity-LLMTranslatePlus-win-arm64.zip    (~10MB)
+  │   └── XUnity-LLMTranslatePlus.exe
+  ├── XUnity-LLMTranslatePlus-win-x86.zip
+  ├── XUnity-LLMTranslatePlus-win-x64.zip
+  └── XUnity-LLMTranslatePlus-win-arm64.zip
   ```
 
 ### 构建产物
@@ -142,24 +187,18 @@ dotnet publish --configuration Release --runtime win-x64 --self-contained false 
 - **ZIP 大小**: ~10MB（75% 压缩率）
 - **需求**: 7-Zip 安装在 `C:\Program Files\7-Zip\7z.exe`
 
-## 架构亮点
-
-- **异步锁机制**：使用 `SemaphoreSlim` 替代传统 `lock`，避免死锁
-- **Channel<T> 批处理**：基于 Channel 的高性能日志和文件写入批处理
-- **线程安全上下文缓存**：多线程环境下的安全上下文管理
-- **并发文件访问**：使用 `FileShare.ReadWrite` 与 XUnity 共存
-- **正则表达式优化**：使用 `[GeneratedRegex]` 提升 3-140 倍性能
-- **依赖注入**：基于 `Microsoft.Extensions.DependencyInjection` 的服务管理
 
 ## 技术栈
 
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| .NET | 9.0 | 应用框架 |
-| WinUI 3 | 1.8 | UI 框架 |
-| CsvHelper | 33.1.0 | CSV 处理 |
-| HttpClient | - | HTTP 客户端 |
-| DPAPI | - | 密钥加密 |
+| 技术 | 用途 |
+|------| ------|
+| .NET | 应用框架 |
+| WinUI 3 | UI 框架 |
+| CommunityToolkit.WinUI.UI.Controls | DataGrid 组件 |
+| AssetsTools.NET | Unity 资源解析 |
+| CsvHelper | CSV 处理 |
+| HttpClient | HTTP 客户端 |
+| DPAPI | 密钥加密 |
 
 ## 项目结构
 
@@ -170,6 +209,7 @@ XUnity-LLMTranslatePlus/
 │   ├── FileMonitorService.cs          # 文件监控
 │   ├── TerminologyService.cs          # 术语管理
 │   ├── SmartTerminologyService.cs     # AI 术语提取
+│   ├── AssetExtractionService.cs      # Unity 资源提取
 │   ├── ConfigService.cs               # 配置管理
 │   └── LogService.cs                  # 日志服务
 ├── Views/                 # UI 页面
@@ -177,9 +217,16 @@ XUnity-LLMTranslatePlus/
 │   ├── ApiConfigPage.xaml             # API 配置
 │   ├── TranslationSettingsPage.xaml   # 翻译设置
 │   ├── TerminologyPage.xaml           # 术语管理
+│   ├── AssetExtractionPage.xaml       # 资源提取
 │   └── LogPage.xaml                   # 日志查看
 ├── Models/                # 数据模型
+│   ├── AppConfig.cs                   # 应用配置
+│   ├── ExtractedText.cs               # 提取的文本数据
+│   └── ...
 └── Utils/                 # 工具类
+    ├── PathValidator.cs               # 路径验证
+    ├── SpecialCharProcessor.cs        # 特殊字符处理
+    └── ...
 ```
 
 ## 贡献
@@ -200,6 +247,10 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 1. 操作系统版本和架构（x86/x64/ARM64）
 2. 错误截图或日志（在 **日志监控** 页面）
 3. 复现步骤
+4. 如使用资源提取功能，请说明：
+   - 游戏使用的 Unity 后端（Mono/IL2CPP）
+   - 扫描模式和配置参数
+   - 目标文件/文件夹路径
 
 ## 致谢
 
