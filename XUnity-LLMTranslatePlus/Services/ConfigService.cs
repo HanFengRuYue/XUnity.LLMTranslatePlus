@@ -174,6 +174,7 @@ namespace XUnity_LLMTranslatePlus.Services
                 CurrentTerminologyFile = config.CurrentTerminologyFile,
                 EnableTextAggregation = config.EnableTextAggregation,
                 TextAggregationDelay = config.TextAggregationDelay,
+                ApplicationTheme = config.ApplicationTheme,
                 AssetExtraction = config.AssetExtraction
             };
         }

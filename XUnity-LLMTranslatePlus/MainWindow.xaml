@@ -89,6 +89,17 @@
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>
+                <NavigationViewItem x:Name="ThemeNavItem"
+                                    Content="跟随系统"
+                                    Tag="Theme"
+                                    SelectsOnInvoked="False"
+                                    Tapped="ThemeNavItem_Tapped"
+                                    ToolTipService.ToolTip="点击切换主题">
+                    <NavigationViewItem.Icon>
+                        <FontIcon x:Name="ThemeNavIcon" Glyph="&#xE793;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
                 <NavigationViewItem Content="关于" Tag="About">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE946;"/>

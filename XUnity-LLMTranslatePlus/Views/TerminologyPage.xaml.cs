@@ -27,6 +27,7 @@ namespace XUnity_LLMTranslatePlus.Views
         private DispatcherQueueTimer? _autoSaveTimer;
         private bool _isLoadingConfig = false;
         private string _currentTerminologyFile = "default";
+        private List<Term> _allTerms = new List<Term>(); // 存储所有术语用于搜索过滤
 
         public TerminologyPage()
         {
@@ -79,8 +80,11 @@ namespace XUnity_LLMTranslatePlus.Views
                     string terminologyPath = GetTerminologyFilePath(_currentTerminologyFile);
                     await _terminologyService.LoadTermsAsync(terminologyPath);
                     var terms = _terminologyService.GetTerms();
+
+                    // 更新所有术语列表和显示列表
+                    _allTerms = new List<Term>(terms);
                     Terms.Clear();
-                    foreach (var term in terms)
+                    foreach (var term in _allTerms)
                     {
                         Terms.Add(term);
                     }
@@ -176,8 +180,11 @@ namespace XUnity_LLMTranslatePlus.Views
                 {
                     await _terminologyService.LoadTermsAsync(terminologyPath);
                     var terms = _terminologyService.GetTerms();
+
+                    // 更新所有术语列表和显示列表
+                    _allTerms = new List<Term>(terms);
                     Terms.Clear();
-                    foreach (var term in terms)
+                    foreach (var term in _allTerms)
                     {
                         Terms.Add(term);
                     }
@@ -415,6 +422,7 @@ namespace XUnity_LLMTranslatePlus.Views
         {
             var newTerm = new Term { Original = "", Translation = "", Enabled = true };
             Terms.Add(newTerm);
+            _allTerms.Add(newTerm); // 同时添加到所有术语列表
 
             // 自动滚动到新添加的项
             TermsListView.SelectedItem = newTerm;
@@ -484,6 +492,7 @@ namespace XUnity_LLMTranslatePlus.Views
             foreach (var term in selectedItems)
             {
                 Terms.Remove(term);
+                _allTerms.Remove(term); // 同时从所有术语列表删除
                 _terminologyService?.RemoveTerm(term);
             }
 
@@ -674,6 +683,46 @@ namespace XUnity_LLMTranslatePlus.Views
                 XamlRoot = this.XamlRoot
             };
             await dialog.ShowAsync();
+        }
+
+        /// <summary>
+        /// 搜索框文本变更事件处理
+        /// </summary>
+        private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ApplySearchFilter();
+        }
+
+        /// <summary>
+        /// 应用搜索过滤
+        /// </summary>
+        private void ApplySearchFilter()
+        {
+            string searchText = SearchBox?.Text?.Trim() ?? "";
+
+            // 如果搜索框为空，显示所有术语
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                Terms.Clear();
+                foreach (var term in _allTerms)
+                {
+                    Terms.Add(term);
+                }
+                return;
+            }
+
+            // 过滤术语：支持源文本和目标文本搜索（不区分大小写）
+            var filteredTerms = _allTerms.Where(term =>
+                (term.Original?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (term.Translation?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            ).ToList();
+
+            // 更新显示列表
+            Terms.Clear();
+            foreach (var term in filteredTerms)
+            {
+                Terms.Add(term);
+            }
         }
     }
 }

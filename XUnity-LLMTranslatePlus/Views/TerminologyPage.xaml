@@ -96,6 +96,17 @@
                                    Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"/>
                     </StackPanel>
 
+                    <!-- 搜索框 -->
+                    <TextBox x:Name="SearchBox"
+                             PlaceholderText="搜索术语（支持源文本和目标文本）"
+                             TextChanged="SearchBox_TextChanged">
+                        <TextBox.Resources>
+                            <ResourceDictionary>
+                                <x:Double x:Key="TextControlThemeMinWidth">0</x:Double>
+                            </ResourceDictionary>
+                        </TextBox.Resources>
+                    </TextBox>
+
                     <!-- 术语表 -->
                     <ListView x:Name="TermsListView"
                               Height="500"
@@ -176,12 +187,6 @@
                              Message="启用后会在翻译过程中自动识别并添加游戏中的人名、地名、技能名等专有名词到术语库。注意：这会增加 API 调用次数和成本。"/>
                 </StackPanel>
             </Expander>
-
-            <!-- 自动保存提示 -->
-            <InfoBar Severity="Informational"
-                     IsOpen="True"
-                     IsClosable="False"
-                     Message="所有术语更改将自动保存"/>
         </StackPanel>
     </ScrollViewer>
 </Page>

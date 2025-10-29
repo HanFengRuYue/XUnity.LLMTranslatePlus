@@ -449,12 +449,6 @@
                         </controls:DataGrid>
                     </Border>
                 </StackPanel>
-
-                <!-- 自动保存提示 -->
-                <InfoBar Severity="Informational"
-                         IsOpen="True"
-                         IsClosable="False"
-                         Message="所有配置更改将自动保存，日志统一显示在【日志监控】页面"/>
             </StackPanel>
         </ScrollViewer>
     </Grid>

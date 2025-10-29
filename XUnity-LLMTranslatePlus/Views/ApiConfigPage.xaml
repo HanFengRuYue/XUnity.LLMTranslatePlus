@@ -144,12 +144,6 @@
                     </Border>
                 </StackPanel>
             </Expander>
-
-            <!-- 自动保存提示 -->
-            <InfoBar Severity="Informational"
-                     IsOpen="True"
-                     IsClosable="False"
-                     Message="所有配置更改将自动保存"/>
         </StackPanel>
     </ScrollViewer>
 </Page>

@@ -59,6 +59,9 @@ namespace XUnity_LLMTranslatePlus.Models
         public bool EnableAutoRefresh { get; set; } = false; // 自动发送 ALT+R 刷新游戏翻译
         public int AutoRefreshInterval { get; set; } = 1; // 自动刷新间隔（秒），范围 1-60
 
+        // 主题设置
+        public string ApplicationTheme { get; set; } = "Default"; // 应用主题：Light, Dark, Default（跟随系统）
+
         // 资产提取配置
         public AssetExtractionConfig AssetExtraction { get; set; } = new AssetExtractionConfig();
     }
