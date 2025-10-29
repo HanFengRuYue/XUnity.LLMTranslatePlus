@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -127,9 +128,8 @@ namespace XUnity_LLMTranslatePlus.Utils
             PathValidator.ValidateFileExists(filePath);
             string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
 
-            const int maxRetries = 5;
+            const int maxRetries = 3; // 优化：从5次降至3次
             int retryCount = 0;
-            Random random = new Random();
 
             while (retryCount < maxRetries)
             {
@@ -217,9 +217,9 @@ namespace XUnity_LLMTranslatePlus.Utils
                 }
                 catch (IOException) when (retryCount < maxRetries - 1)
                 {
-                    // 文件被占用，等待后重试
+                    // 文件被占用，使用指数退避重试（50ms, 100ms, 200ms）
                     retryCount++;
-                    int delayMs = random.Next(100, 500); // 随机延迟 100-500ms
+                    int delayMs = 50 * (1 << (retryCount - 1)); // 指数退避：50, 100, 200
                     await Task.Delay(delayMs, cancellationToken);
                 }
                 catch (Exception ex)
@@ -280,9 +280,8 @@ namespace XUnity_LLMTranslatePlus.Utils
             // 验证文件路径
             string validatedPath = PathValidator.ValidateAndNormalizePath(filePath);
 
-            const int maxRetries = 5;
+            const int maxRetries = 3; // 优化：从5次降至3次
             int retryCount = 0;
-            Random random = new Random();
 
             while (retryCount < maxRetries)
             {
@@ -390,9 +389,9 @@ namespace XUnity_LLMTranslatePlus.Utils
                 }
                 catch (IOException) when (retryCount < maxRetries - 1)
                 {
-                    // 文件被占用，等待后重试
+                    // 文件被占用，使用指数退避重试（100ms, 200ms, 400ms）
                     retryCount++;
-                    int delayMs = random.Next(200, 1000); // 随机延迟 200-1000ms
+                    int delayMs = 100 * (1 << (retryCount - 1)); // 指数退避：100, 200, 400
                     await Task.Delay(delayMs, cancellationToken);
                 }
                 catch (Exception ex)

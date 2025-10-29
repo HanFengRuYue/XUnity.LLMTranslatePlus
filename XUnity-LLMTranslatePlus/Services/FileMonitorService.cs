@@ -366,7 +366,7 @@ namespace XUnity_LLMTranslatePlus.Services
             {
                 try
                 {
-                    await Task.Delay(200); // 优化：等待时间从500ms降至200ms
+                    await Task.Delay(100); // 优化：等待时间从200ms降至100ms
                     await LoadAndProcessFileAsync();
                 }
                 catch (Exception ex)
@@ -688,7 +688,7 @@ namespace XUnity_LLMTranslatePlus.Services
                     {
                         // 使用 WaitToReadAsync 配合 TryRead 避免 continuation 冲突
                         var waitToReadTask = _writeQueue.Reader.WaitToReadAsync(cancellationToken).AsTask();
-                        var timeoutTask = Task.Delay(200, cancellationToken); // 优化：从500ms降低到200ms
+                        var timeoutTask = Task.Delay(100, cancellationToken); // 优化：从200ms降低到100ms
 
                         var completedTask = await Task.WhenAny(waitToReadTask, timeoutTask);
 
@@ -737,7 +737,7 @@ namespace XUnity_LLMTranslatePlus.Services
                                 await _logService.LogAsync($"[批量写入] 已写入 {mergedTranslations.Count} 条翻译到文件", LogLevel.Info);
 
                                 // 等待文件系统稳定（防止写入后立即触发监控）
-                                await Task.Delay(300, cancellationToken);
+                                await Task.Delay(200, cancellationToken); // 优化：从300ms降至200ms
                             }
                             finally
                             {
