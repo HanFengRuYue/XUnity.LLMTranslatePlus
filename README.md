@@ -7,11 +7,18 @@
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)](https://dotnet.microsoft.com/)
 [![WinUI 3](https://img.shields.io/badge/WinUI-3.0-0078D4)](https://github.com/microsoft/microsoft-ui-xaml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/HanFengRuYue/XUnity.LLMTranslatePlus/releases)
+[![Version](https://img.shields.io/badge/version-2.0.1-green.svg)](https://github.com/HanFengRuYue/XUnity.LLMTranslatePlus/releases)
 
 </div>
 
 ## 最近更新
+
+### v2.0.1 (2025-10-30)
+
+- **文件 I/O 性能优化**：大幅提升文件读写响应速度
+  - **重试机制优化**：从 5 次重试降至 3 次，采用指数退避策略
+  - **固定延迟优化**：减少 FileMonitorService 中的多个固定延迟
+  - **整体影响**：文本读写周期现在可在 1 秒内完成（不包括 API 翻译时间）
 
 ### v2.0.0 (2025-10-29)
 
